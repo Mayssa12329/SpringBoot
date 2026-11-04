@@ -1,0 +1,39 @@
+services:
+  # Service Base de données : PostgreSQL 16
+  postgres:
+    image: postgres:16-alpine
+    container_name: medivet-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: medivet_db
+      POSTGRES_USER: medivet_user
+      POSTGRES_PASSWORD: medivet_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medivet_user -d medivet_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Service Application : Spring Boot (Java 21)
+  app:
+    build: .
+    container_name: medivet-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/medivet_db
+      SPRING_DATASOURCE_USERNAME: medivet_user
+      SPRING_DATASOURCE_PASSWORD: medivet_password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
