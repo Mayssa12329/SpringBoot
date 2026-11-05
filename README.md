@@ -54,24 +54,24 @@ Le système repose sur une architecture **microservices polyglotte en protocoles
 
 ### A. Les 8 Services Métier
 
-| Service | Protocole exposé | Données propres (Ressources) | Décisions & Règles clés | Appels sortants | Responsable |
-| :--- | :--- | :--- | :--- | :--- | :--- |
-| **UserService** | REST | Compte, rôle, session JWT | Authentification, RBAC, hachage mdp (RM16) | — | **Ingénieur 1** |
-| **PetPassService** | REST + client SOAP | Animal, carnet médical, vaccins, accès | Chronologie des actes, éligibilité médicale (RM09) | → VetInterop (SOAP)<br>→ NotificationService | **Ingénieur 2** *(av. Ing. 4)* |
-| **VetBookingService**| REST | Disponibilités, créneaux, RDV, file d'attente | Créneau unique (RM06), compatibilité acte (RM07), FIFO (RM08) | → NotificationService | **Ingénieur 2** *(av. Ing. 6)* |
-| **HelpAnimalService**| REST | Signalements, photos, GPS, statuts | Priorité (RM01), doublons 100m/2h (RM02), cycle de vie (RM03) | → RescueCoordination (gRPC)<br>→ PetPass (REST) | **Ingénieur 3** |
-| **RescueCoordinationService** | gRPC (unaire + stream) | Missions de sauvetage, affectation intervenant | Verrou optimiste (RM04), réattribution 15 min (RM05) | → NotificationService | **Ingénieur 3** *(av. Ing. 4)* |
-| **VetPharmaService**| gRPC (unaire + stream) | Produits, pharmacies, stocks, réservations | Stock dispo, réservation 15 min, idempotence (RM11) | — | **Ingénieur 4** |
-| **VetInteropService**| SOAP (XSD/WSDL) | Registre national simulé (puce 15 chiffres) | Verdict (VERIFIED, NOT_FOUND), SOAP Fault (RM10) | — | **Ingénieur 5** |
-| **AdoptAnimalService**| REST | Annonces d'adoption, candidatures, visites | Éligibilité médicale, adoption finale unique (RM12) | → PetPass (REST)<br>→ VetInterop (SOAP)<br>→ NotificationService | **Ingénieur 5** *(av. Ing. 6)* |
+| Service | Protocole exposé | Données propres (Ressources) | Décisions & Règles clés | Appels sortants |
+| :--- | :--- | :--- | :--- | :--- |
+| **UserService** | REST | Compte, rôle, session JWT | Authentification, RBAC, hachage mdp (RM16) | — |
+| **PetPassService** | REST + client SOAP | Animal, carnet médical, vaccins, accès | Chronologie des actes, éligibilité médicale (RM09) | → VetInterop (SOAP)<br>→ NotificationService |
+| **VetBookingService**| REST | Disponibilités, créneaux, RDV, file d'attente | Créneau unique (RM06), compatibilité acte (RM07), FIFO (RM08) | → NotificationService |
+| **HelpAnimalService**| REST | Signalements, photos, GPS, statuts | Priorité (RM01), doublons 100m/2h (RM02), cycle de vie (RM03) | → RescueCoordination (gRPC)<br>→ PetPass (REST) |
+| **RescueCoordinationService** | gRPC (unaire + stream) | Missions de sauvetage, affectation intervenant | Verrou optimiste (RM04), réattribution 15 min (RM05) | → NotificationService |
+| **VetPharmaService**| gRPC (unaire + stream) | Produits, pharmacies, stocks, réservations | Stock dispo, réservation 15 min, idempotence (RM11) | — |
+| **VetInteropService**| SOAP (XSD/WSDL) | Registre national simulé (puce 15 chiffres) | Verdict (VERIFIED, NOT_FOUND), SOAP Fault (RM10) | — |
+| **AdoptAnimalService**| REST | Annonces d'adoption, candidatures, visites | Éligibilité médicale, adoption finale unique (RM12) | → PetPass (REST)<br>→ VetInterop (SOAP)<br>→ NotificationService |
 
 ### B. Composants Transverses
 
-| Composant | Protocole | Rôle | Responsable |
-| :--- | :--- | :--- | :--- |
-| **API Gateway** | REST (entrée unique) | Routage `/api/v1`, validation centralisée des JWT, rate limiting (RM16) | **Ingénieur 6** *(av. Ing. 1)* |
-| **NotificationService**| Événements / REST | Envoi dédupliqué par clé unique, rappels J-7, retries (RM14) | **Ingénieur 6** |
-| **AdminService** | REST | Tableaux de bord, modération, journal d'audit centralisé (RM15) | **Ingénieur 1** *(av. Ing. 6)* |
+| Composant | Protocole | Rôle |
+| :--- | :--- | :--- |
+| **API Gateway** | REST (entrée unique) | Routage `/api/v1`, validation centralisée des JWT, rate limiting (RM16) |
+| **NotificationService**| Événements / REST | Envoi dédupliqué par clé unique, rappels J-7, retries (RM14) |
+| **AdminService** | REST | Tableaux de bord, modération, journal d'audit centralisé (RM15) |
 
 ---
 
