@@ -34,35 +34,36 @@ MEDIVET/
             └── MedivetApplicationTests.java
 ```
 ## Architecture des services
-                    Client (web / mobile)
-                            │  HTTP REST + (JWT en bonus)
-                            ▼
-                ┌──────────────────────┐
-                │     API Gateway      │  :8080
-                │ Spring Cloud Gateway │
-                └───┬──────────────┬───┘
-            REST    │              │    REST
-                    ▼              ▼
-         ┌────────────────┐  ┌─────────────────┐
-         │ PetPassService │  │HelpAnimalService│
-         │   REST :8082   │  │   REST :8083    │
-         └───┬────────┬───┘  └──┬───────────┬──┘
-             │        │  REST   │           │
-             │        │◄────────┘           │ gRPC unaire (timeout 3 s)
-             │ SOAP   │ (éligibilité,       │ + streaming des missions
-             │        │  dossier)           ▼
-             ▼        ▼              ┌──────────────────────┐
-   ┌──────────────┐ ┌──────────┐     │ RescueCoordination   │
-   │VetInterop    │ │ petpass  │     │ gRPC :9090 / HTTP    │
-   │SOAP :8081    │ │   -db    │     │ :8084 (actuator)     │
-   │registre en   │ └──────────┘     └──────────┬───────────┘
-   │mémoire       │                             ▼
-   └──────────────┘   ┌──────────────┐    ┌──────────┐
-                      │helpanimal-db │    │ rescue-db│
-                      └──────────────┘    └──────────┘
 
+                      Client (web / mobile / Postman)
+                                   │ HTTP REST  /api/v1/**
+                                   ▼
+                    ┌─────────────────────────────┐
+                    │  API GATEWAY  (:8080)       │
+                    │  Spring Cloud Gateway       │
+                    │  routage + (JWT en bonus)   │
+                    └──────────┬──────────┬───────┘
+                       REST    │          │    REST
+                               ▼          ▼
+                ┌──────────────────┐   ┌────────────────────┐
+                │ PETPASS (:8082)  │◄──│ HELPANIMAL (:8083) │
+                │ REST             │REST│ REST              │
+                │ animal, carnet   │   │ signalements       │
+                └───┬──────────┬───┘   └─────┬──────────┬───┘
+                    │ SOAP     │ JDBC        │ JDBC     │ gRPC unaire (timeout 3 s)
+                    │          ▼             ▼          │ + gRPC streaming
+                    │     [petpass-db]  [helpanimal-db] │
+                    ▼                                   ▼
+        ┌──────────────────────┐        ┌─────────────────────────────┐
+        │ VETINTEROP (:8081)   │        │ RESCUE COORDINATION         │
+        │ SOAP, XSD/WSDL       │        │ gRPC :9090 / HTTP :8084     │
+        │ registre en mémoire  │        │ intervenants, missions      │
+        │ SOAP Fault           │        └──────────────┬──────────────┘
+        └──────────────────────┘                       │ JDBC
+                                                       ▼
+                                                  [rescue-db]
 
-
+        ═════════ réseau Docker unique : medivet-net (DNS par nom de service) ═════════
 
 
 
