@@ -60,6 +60,12 @@ MEDIVET/
    └──────────────┘   ┌──────────────┐    ┌──────────┐
                       │helpanimal-db │    │ rescue-db│
                       └──────────────┘    └──────────┘
+
+
+
+
+
+
 ## Démarrage rapide
 
 ### 1. Avec Docker (Recommandé pour toute l'équipe)
