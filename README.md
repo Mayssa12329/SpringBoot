@@ -33,7 +33,33 @@ MEDIVET/
         └── java/com/medivet/
             └── MedivetApplicationTests.java
 ```
-
+## Architecture des services
+                    Client (web / mobile)
+                            │  HTTP REST + (JWT en bonus)
+                            ▼
+                ┌──────────────────────┐
+                │     API Gateway      │  :8080
+                │ Spring Cloud Gateway │
+                └───┬──────────────┬───┘
+            REST    │              │    REST
+                    ▼              ▼
+         ┌────────────────┐  ┌─────────────────┐
+         │ PetPassService │  │HelpAnimalService│
+         │   REST :8082   │  │   REST :8083    │
+         └───┬────────┬───┘  └──┬───────────┬──┘
+             │        │  REST   │           │
+             │        │◄────────┘           │ gRPC unaire (timeout 3 s)
+             │ SOAP   │ (éligibilité,       │ + streaming des missions
+             │        │  dossier)           ▼
+             ▼        ▼              ┌──────────────────────┐
+   ┌──────────────┐ ┌──────────┐     │ RescueCoordination   │
+   │VetInterop    │ │ petpass  │     │ gRPC :9090 / HTTP    │
+   │SOAP :8081    │ │   -db    │     │ :8084 (actuator)     │
+   │registre en   │ └──────────┘     └──────────┬───────────┘
+   │mémoire       │                             ▼
+   └──────────────┘   ┌──────────────┐    ┌──────────┐
+                      │helpanimal-db │    │ rescue-db│
+                      └──────────────┘    └──────────┘
 ## Démarrage rapide
 
 ### 1. Avec Docker (Recommandé pour toute l'équipe)
