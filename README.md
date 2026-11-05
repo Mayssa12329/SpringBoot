@@ -1,108 +1,175 @@
-# MEDIVET
+# 🐾 MediVet Connect
 
-Projet Spring Boot (3.4.x) avec **Java 21 LTS**, **PostgreSQL 16** et **Docker**.
+Plateforme distribuée et cloud-native pour la santé animale, la prise de rendez-vous vétérinaires, les urgences de sauvetage, l'adoption et la gestion pharmaceutique.
 
-## Stack Technique
+Projet réalisé par une équipe de **6 ingénieurs** selon la méthodologie **Agile/Scrum** (Spring Boot 3.4.x, Java 21 LTS, PostgreSQL 16, Docker).
 
-| Composant | Version | Rôle |
-| :--- | :--- | :--- |
-| **Java JDK** | 21 LTS | Runtime & Compilation |
-| **Spring Boot** | 3.4.2 | Framework backend |
-| **Base de données** | PostgreSQL 16 | Stockage relationnel |
-| **Outils** | Docker & Docker Compose | Conteneurisation & environnement unifié |
+---
 
-## Structure du projet
+## 🏛️ 1. Architecture Globale du Système
+
+Le système repose sur une architecture **microservices polyglotte en protocoles** (REST, gRPC, SOAP) où chaque service est strictement propriétaire de ses données et de ses règles métier.
 
 ```
-MEDIVET/
-├── Dockerfile
-├── docker-compose.yml
-├── .dockerignore
-├── pom.xml
-├── .gitignore
-├── README.md
-└── src/
-    ├── main/
-    │   ├── java/com/medivet/
-    │   │   ├── config/
-    │   │   │   └── SecurityConfig.java
-    │   │   └── MedivetApplication.java
-    │   └── resources/
-    │       └── application.properties
-    └── test/
-        └── java/com/medivet/
-            └── MedivetApplicationTests.java
-```
-## Architecture des services
-
-                      Client (web / mobile / Postman)
-                                   │ HTTP REST  /api/v1/**
-                                   ▼
-                    ┌─────────────────────────────┐
-                    │  API GATEWAY  (:8080)       │
-                    │  Spring Cloud Gateway       │
-                    │  routage + (JWT en bonus)   │
-                    └──────────┬──────────┬───────┘
-                       REST    │          │    REST
-                               ▼          ▼
-                ┌──────────────────┐   ┌────────────────────┐
-                │ PETPASS (:8082)  │◄──│ HELPANIMAL (:8083) │
-                │ REST             │REST│ REST              │
-                │ animal, carnet   │   │ signalements       │
-                └───┬──────────┬───┘   └─────┬──────────┬───┘
-                    │ SOAP     │ JDBC        │ JDBC     │ gRPC unaire (timeout 3 s)
-                    │          ▼             ▼          │ + gRPC streaming
-                    │     [petpass-db]  [helpanimal-db] │
-                    ▼                                   ▼
-        ┌──────────────────────┐        ┌─────────────────────────────┐
-        │ VETINTEROP (:8081)   │        │ RESCUE COORDINATION         │
-        │ SOAP, XSD/WSDL       │        │ gRPC :9090 / HTTP :8084     │
-        │ registre en mémoire  │        │ intervenants, missions      │
-        │ SOAP Fault           │        └──────────────┬──────────────┘
-        └──────────────────────┘                       │ JDBC
-                                                       ▼
-                                                  [rescue-db]
-
-        ═════════ réseau Docker unique : medivet-net (DNS par nom de service) ═════════
-
-
-
-## Démarrage rapide
-
-### 1. Avec Docker (Recommandé pour toute l'équipe)
-
-Aucune installation préalable de Java ou PostgreSQL n'est requise. Seul Docker est nécessaire :
-
-```bash
-docker compose up --build
-```
-
-- **Application** : `http://localhost:8080`
-- **PostgreSQL** : `localhost:5432`
-  - Base de données : `medivet_db`
-  - Utilisateur : `medivet_user`
-  - Mot de passe : `medivet_password`
-
-Pour arrêter les conteneurs :
-```bash
-docker compose down
+                              ┌────────────────────────┐
+                              │  Client Web / Mobile   │
+                              └───────────┬────────────┘
+                                          │  HTTP / REST
+                                          ▼
+                         ┌─────────────────────────────────┐
+                         │   API Gateway (Spring Cloud)    │
+                         │   Routage /api/v1, Sécurité JWT │
+                         └────┬───────────┬───────────┬────┘
+                              │           │           │
+       ┌──────────────────────┼───────────┼───────────┼──────────────────────┐
+       │ (REST)               │ (REST)    │ (REST)    │ (REST)               │ (REST)
+       ▼                      ▼           ▼           ▼                      ▼
+┌──────────────┐     ┌─────────────┐ ┌─────────┐ ┌─────────────┐     ┌──────────────┐
+│ UserService  │     │ PetPass     │ │ Vet-    │ │ HelpAnimal  │     │ AdoptAnimal  │
+│ Auth / JWT   │     │ Dossier Méd.│ │ Booking │ │ Signalements│     │ Annonces &   │
+└──────────────┘     └──────┬──────┘ └────┬────┘ └──────┬──────┘     │ Candidatures │
+                            │             │             │            └──────┬───────┘
+                     (SOAP) │             │ (Événements)│ (gRPC)            │ (REST)
+                            ▼             │             ▼                   ▼
+                     ┌─────────────┐      │      ┌─────────────┐     ┌──────────────┐
+                     │ VetInterop  │      │      │ Rescue-     │     │ Notification │
+                     │ Registre Ext│      │      │ Coordination│     │ Service      │
+                     └─────────────┘      │      └──────┬──────┘     └──────────────┘
+                                          │ (Événements)│ (Événements)
+                                          ▼             ▼
+                                  ┌─────────────────────────────┐
+                                  │     NotificationService     │
+                                  └─────────────────────────────┘
+                                                 ▲
+                                          (gRPC) │
+                                  ┌──────────────┴──────────────┐
+                                  │      VetPharmaService       │
+                                  │ Stocks & Réservations gRPC  │
+                                  └─────────────────────────────┘
 ```
 
 ---
 
-### 2. Sans Docker (Exécution locale)
+## 📦 2. Services Métier & Composants Transverses
 
-#### Prérequis
-- Java 21 LTS
-- PostgreSQL 16 installé et démarré en local (ou lancer uniquement le conteneur DB avec `docker compose up postgres`)
-- Maven 3.9+
+### A. Les 8 Services Métier
 
-#### Commandes utiles
-- Compiler le projet :
-  ```bash
-  mvn clean compile
-  ```
-- Lancer l'application :
-  ```bash
-  mvn spring-boot:run
-  ```
+| Service | Protocole exposé | Données propres (Ressources) | Décisions & Règles clés | Appels sortants | Responsable |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **UserService** | REST | Compte, rôle, session JWT | Authentification, RBAC, hachage mdp (RM16) | — | **Ingénieur 1** |
+| **PetPassService** | REST + client SOAP | Animal, carnet médical, vaccins, accès | Chronologie des actes, éligibilité médicale (RM09) | → VetInterop (SOAP)<br>→ NotificationService | **Ingénieur 2** *(av. Ing. 4)* |
+| **VetBookingService**| REST | Disponibilités, créneaux, RDV, file d'attente | Créneau unique (RM06), compatibilité acte (RM07), FIFO (RM08) | → NotificationService | **Ingénieur 2** *(av. Ing. 6)* |
+| **HelpAnimalService**| REST | Signalements, photos, GPS, statuts | Priorité (RM01), doublons 100m/2h (RM02), cycle de vie (RM03) | → RescueCoordination (gRPC)<br>→ PetPass (REST) | **Ingénieur 3** |
+| **RescueCoordinationService** | gRPC (unaire + stream) | Missions de sauvetage, affectation intervenant | Verrou optimiste (RM04), réattribution 15 min (RM05) | → NotificationService | **Ingénieur 3** *(av. Ing. 4)* |
+| **VetPharmaService**| gRPC (unaire + stream) | Produits, pharmacies, stocks, réservations | Stock dispo, réservation 15 min, idempotence (RM11) | — | **Ingénieur 4** |
+| **VetInteropService**| SOAP (XSD/WSDL) | Registre national simulé (puce 15 chiffres) | Verdict (VERIFIED, NOT_FOUND), SOAP Fault (RM10) | — | **Ingénieur 5** |
+| **AdoptAnimalService**| REST | Annonces d'adoption, candidatures, visites | Éligibilité médicale, adoption finale unique (RM12) | → PetPass (REST)<br>→ VetInterop (SOAP)<br>→ NotificationService | **Ingénieur 5** *(av. Ing. 6)* |
+
+### B. Composants Transverses
+
+| Composant | Protocole | Rôle | Responsable |
+| :--- | :--- | :--- | :--- |
+| **API Gateway** | REST (entrée unique) | Routage `/api/v1`, validation centralisée des JWT, rate limiting (RM16) | **Ingénieur 6** *(av. Ing. 1)* |
+| **NotificationService**| Événements / REST | Envoi dédupliqué par clé unique, rappels J-7, retries (RM14) | **Ingénieur 6** |
+| **AdminService** | REST | Tableaux de bord, modération, journal d'audit centralisé (RM15) | **Ingénieur 1** *(av. Ing. 6)* |
+
+---
+
+## 🔌 3. Interopérabilité et Protocoles
+
+Le projet répond strictement aux critères d'architecture avancée :
+
+1. **REST (OpenAPI v3 / Swagger)** :
+   * Préfixe d'API unique : `/api/v1/`
+   * Gestion centralisée des erreurs via `@RestControllerAdvice` (HTTP 401, 403, 404, 409, 422).
+2. **gRPC (Protocol Buffers)** :
+   * **RPC unaire** : Recherche de produits pharmaceutiques, affectation d'une mission de sauvetage.
+   * **RPC streaming (Server Streaming)** : Flux en direct des disponibilités des pharmacies, diffusion continue des nouvelles missions d'urgence aux intervenants connectés.
+   * Gestion des statuts gRPC (`NOT_FOUND`, `INVALID_ARGUMENT`, `FAILED_PRECONDITION`, `DEADLINE_EXCEEDED`).
+3. **SOAP (Contract-First)** :
+   * Schéma XSD rédigé avant le code, exposant les opérations : `VerifyAnimalIdentity`, `GetAnimalIdentification`, `CheckMicrochipStatus`.
+   * Distinction stricte entre résultat métier (`NOT_FOUND`) et erreur protocolaire (`SOAP Fault`).
+4. **Appels Inter-Services Hétérogènes** :
+   * `PetPassService` (REST) ➔ `VetInteropService` (SOAP) avec client `WebServiceTemplate` résilient.
+   * `HelpAnimalService` (REST) ➔ `RescueCoordinationService` (gRPC) avec timeout et circuit breaker (Resilience4j).
+
+---
+
+## 🗄️ 4. Architecture de Données (PostgreSQL 16)
+
+Conformément au pattern **Database-per-Service**, chaque domaine est cloisonné dans un schéma PostgreSQL dédié hébergé sur une instance commune :
+
+* `users_schema` : Comptes, mots de passe hashés, rôles.
+* `petpass_schema` : Profils animaux, dossiers médicaux, vaccins, consentements.
+* `booking_schema` : Créneaux d'ouverture, rendez-vous confirmés, file d'attente FIFO.
+* `helpanimal_schema` : Signalements géolocalisés, photos, historique d'états.
+* `rescue_schema` : Missions de secours, intervenants, verrous de concurrence.
+* `pharma_schema` : Catalogues produits, niveaux de stock, réservations avec clé d'idempotence.
+* `adopt_schema` : Annonces refuges, candidatures, formalisation des adoptions.
+* `notification_schema` : Historique des notifications, déduplication, préférences.
+* `admin_schema` : Journaux d'audit de sécurité et statistiques.
+
+> [!NOTE]
+> Aucun lien de clé étrangère (FK) physique n'existe entre deux schémas différents. Les services communiquent via des identifiants logiques (`user_id`, `animal_id`, etc.).
+
+---
+
+## 👥 5. Organisation de l'Équipe (6 Ingénieurs)
+
+| Ingénieur | Périmètre fonctionnel (Epics) | Modules & Services | Livrables techniques majeurs |
+| :---: | :--- | :--- | :--- |
+| **Ingénieur 1** | E01 (Utilisateurs), E11 (Admin) | `UserService`, `AdminService` | Sécurité Spring Security, tokens JWT, journalisation d'audit |
+| **Ingénieur 2** | E02 (Animaux), E03 (VetBooking) | `PetPassService`, `VetBookingService` | Carnet PetPass, gestion des créneaux et verrous de réservation |
+| **Ingénieur 3** | E04 (HelpAnimal), E08 (VetCare) | `HelpAnimalService`, `RescueCoordination` | Géolocalisation GPS, détection doublons, client/serveur gRPC |
+| **Ingénieur 4** | E06 (VetPharma), E02/E08 (Support) | `VetPharmaService` (gRPC) | Contrats `.proto`, streaming gRPC, gestion d'idempotence de stock |
+| **Ingénieur 5** | E05 (AdoptAnimal), E07 (SOAP Interop) | `AdoptAnimalService`, `VetInteropService` | Contrat XSD/WSDL contract-first, client SOAP résilient |
+| **Ingénieur 6** | E10 (Notifications), E09 (VetFlow) | `NotificationService`, `API Gateway` | Spring Cloud Gateway, bus d'événements, intégration globale |
+
+---
+
+## 📋 6. Règles Métier Principales (RM)
+
+* **RM01 (Priorité urgence)** : Score basé sur gravité (1–5), ancienneté (+1 pt / 30 min) et carence de secours.
+* **RM02 (Anti-doublon GPS)** : Rattachement automatique si signalement dans un rayon de 100 m et < 2 heures.
+* **RM03 (Cycle de vie sauvetage)** : `Nouveau` ➔ `Qualifié` ➔ `Attribué` ➔ `En cours` ➔ `Terminé` (interdiction des sauts d'états).
+* **RM04 & RM05 (Missions de secours)** : Verrouillage optimiste contre la concurrence d'attribution ; réattribution automatique après 15 min.
+* **RM06 & RM08 (Rendez-vous)** : Unicité stricte du créneau (409 Conflict si doublon) ; file d'attente FIFO proposée pendant 30 min.
+* **RM10 (Identification animale)** : Contrôle de la puce à 15 chiffres via SOAP ; statut `VERIFIED` requis pour publication en adoption.
+* **RM11 (Pharmacie)** : Réservation bloquée 15 min max, idempotence garantie par clé unique.
+* **RM12 (Adoption)** : Une seule adoption finalisée possible par animal ; rejet automatique des candidatures concurrentes.
+* **RM16 (Sécurité Gateway)** : Accès conditionné par JWT valide ; contrôle strict des rôles (401 Non autorisé, 403 Interdit).
+
+---
+
+## 🎬 7. Scénarios de Démonstration Clés
+
+1. **SC1 : Enregistrement d'un animal et vérification SOAP** (`REST ➔ SOAP`)
+2. **SC2 : Signalement citoyen, affectation gRPC et streaming de mission** (`REST ➔ gRPC unitaire + streaming`)
+3. **SC3 : Soin vétérinaire et recherche/réservation de médicament** (`REST ➔ gRPC`)
+4. **SC4 : Réservation concurrente de consultation et liste d'attente** (`REST + Concurrence`)
+5. **SC5 : Parcours complet d'adoption d'un animal secouru** (`REST + SOAP + Événements`)
+
+---
+
+## 🚀 8. Démarrage Rapide
+
+### Prérequis
+* **Docker & Docker Compose** (moteur récent)
+* *Optionnel pour le dev local hors conteneur :* Java 21 LTS, Maven 3.9+
+
+### Lancement de l'environnement complet
+```bash
+# Démarrer tous les services et la base PostgreSQL
+docker compose up --build
+```
+
+* **API Gateway** : `http://localhost:8080` (point d'accès unifié `/api/v1/...`)
+* **Base PostgreSQL 16** : `localhost:5432`
+  * Base : `medivet_db`
+  * Utilisateur : `medivet_user`
+  * Mot de passe : `medivet_password`
+
+Pour arrêter et nettoyer les conteneurs :
+```bash
+docker compose down
+```
