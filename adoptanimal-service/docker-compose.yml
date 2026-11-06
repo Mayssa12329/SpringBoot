@@ -1,0 +1,48 @@
+name: adoptanimal
+
+networks:
+  medivet-net:
+    driver: bridge
+
+volumes:
+  adopt-data:
+
+services:
+  adopt-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-medivet}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${ADOPT_DB:-adoptanimal}
+    volumes:
+      - adopt-data:/var/lib/postgresql/data
+    networks: [medivet-net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-medivet} -d ${ADOPT_DB:-adoptanimal}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  adoptanimal:
+    build: .
+    ports: ["${ADOPTANIMAL_PORT:-8085}:8080"]
+    environment:
+      SERVICE_NAME: adoptanimal
+      SPRING_DATASOURCE_URL: jdbc:postgresql://adopt-db:5432/${ADOPT_DB:-adoptanimal}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-medivet}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      PETPASS_URL: ${PETPASS_URL:-http://petpass:8080}
+      VETINTEROP_URL: ${VETINTEROP_URL:-http://vetinterop:8080/ws}
+      SPRING_PROFILES_ACTIVE: ${ADOPT_PROFILE:-stub}
+    depends_on:
+      adopt-db:
+        condition: service_healthy
+    networks: [medivet-net]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 40s
