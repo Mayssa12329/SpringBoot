@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  CONTRAT PROVISOIRE du registre VetInterop (RM10), utilisé pour générer le client SOAP.
+  À REMPLACER par le XSD officiel écrit par le responsable de VetInterop (US40 à US42).
+  Seule l'opération utilisée par AdoptAnimal est décrite ici : VerifyAnimalIdentity.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:tns="http://medivet.tn/vetinterop"
+           targetNamespace="http://medivet.tn/vetinterop"
+           elementFormDefault="qualified">
+
+  <xs:simpleType name="Puce">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[0-9]{15}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="Verdict">
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="VERIFIED"/>
+      <xs:enumeration value="NOT_FOUND"/>
+      <xs:enumeration value="INCONSISTENT"/>
+      <xs:enumeration value="UNDETERMINED"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:element name="VerifyAnimalIdentityRequest">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="puce" type="tns:Puce"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:element name="VerifyAnimalIdentityResponse">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="verdict" type="tns:Verdict"/>
+        <xs:element name="message" type="xs:string" minOccurs="0"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
