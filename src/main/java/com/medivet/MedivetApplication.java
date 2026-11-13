@@ -9,6 +9,4 @@ public class MedivetApplication {
     public static void main(String[] args) {
         SpringApplication.run(MedivetApplication.class, args);
     }
-
 }
-
