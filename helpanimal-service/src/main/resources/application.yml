@@ -1,0 +1,67 @@
+# Profil par defaut : base H2 en memoire, aucune installation requise.
+# Pour PostgreSQL : lancer avec le profil "postgres" (voir README.md).
+server:
+  port: 8084
+
+spring:
+  application:
+    name: helpanimal-service
+  datasource:
+    url: jdbc:h2:mem:helpanimal;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: none        # le schema est gere par Flyway (src/main/resources/db/migration)
+    open-in-view: false
+  flyway:
+    enabled: true
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
+# Secret partage avec UserService pour verifier les JWT (HS256, 32 caracteres minimum)
+security:
+  jwt:
+    secret: medivet-connect-dev-secret-change-me-2026!
+  # Endpoint /api/dev/token pour generer des jetons de test (a desactiver en production)
+  dev-tokens:
+    enabled: true
+
+helpanimal:
+  storage:
+    directory: uploads
+  photo:
+    max-size-bytes: 5242880
+  duplicate:
+    radius-meters: 100
+    window-minutes: 120
+  nearby:
+    default-radius-km: 5
+    max-radius-km: 50
+
+# Appel gRPC vers RescueCoordinationService (RM13)
+rescue:
+  grpc:
+    host: localhost
+    port: 9090
+    timeout-ms: 3000
+    max-attempts: 3        # 1 appel + 2 reprises
+    retry-wait-ms: 200
+  stub:
+    enabled: true          # S3 : stub local ; passer a false en S5 pour le vrai service
+    port: 9090
+
+# Appel REST vers PetPassService (dossier de prise en charge a la fin du sauvetage)
+petpass:
+  enabled: false
+  base-url: http://localhost:8082
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html

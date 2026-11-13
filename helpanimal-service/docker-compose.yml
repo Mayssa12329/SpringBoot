@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: helpanimal-postgres
+    environment:
+      POSTGRES_DB: helpanimal
+      POSTGRES_USER: helpanimal
+      POSTGRES_PASSWORD: helpanimal
+    ports:
+      - "5433:5432"
+    volumes:
+      - helpanimal-data:/var/lib/postgresql/data
+
+volumes:
+  helpanimal-data:

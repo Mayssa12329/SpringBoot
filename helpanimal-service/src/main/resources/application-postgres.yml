@@ -1,0 +1,9 @@
+# Profil PostgreSQL : lancer "docker compose up -d" puis l'application avec ce profil.
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5433/helpanimal
+    username: helpanimal
+    password: helpanimal
+  h2:
+    console:
+      enabled: false

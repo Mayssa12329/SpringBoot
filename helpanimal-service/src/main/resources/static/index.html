@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HelpAnimal - MediVet Connect</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, sans-serif; display: flex; height: 100vh; color: #1f2937; }
+    aside { width: 360px; padding: 16px; overflow-y: auto; border-right: 1px solid #e5e7eb; background: #f9fafb; }
+    #map { flex: 1; }
+    h1 { font-size: 18px; margin: 0 0 12px; }
+    h2 { font-size: 14px; margin: 18px 0 8px; text-transform: uppercase; color: #6b7280; }
+    label { display: block; font-size: 13px; margin: 6px 0 2px; }
+    input, select, textarea, button { width: 100%; padding: 6px 8px; font: inherit; font-size: 14px; }
+    button { margin-top: 8px; cursor: pointer; background: #2563eb; color: white; border: 0; border-radius: 6px; }
+    button.secondary { background: #6b7280; }
+    .row { display: flex; gap: 8px; }
+    .row > * { flex: 1; }
+    #msg { margin-top: 10px; font-size: 13px; white-space: pre-wrap; }
+    .ok { color: #047857; } .err { color: #b91c1c; }
+    .item { background: white; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px; margin: 6px 0; font-size: 13px; }
+    .popup img { max-width: 180px; display: block; margin-top: 6px; }
+  </style>
+</head>
+<body>
+<aside>
+  <h1>HelpAnimal</h1>
+
+  <h2>1. Se connecter (jeton de test)</h2>
+  <div class="row">
+    <div><label>Id utilisateur</label><input id="userId" type="number" value="1"></div>
+    <div><label>Role</label>
+      <select id="role">
+        <option>CITOYEN</option><option>BENEVOLE</option><option>INTERVENANT</option><option>ADMIN</option>
+      </select>
+    </div>
+  </div>
+  <button onclick="login()">Obtenir un jeton</button>
+  <div id="who" style="font-size:13px;margin-top:6px"></div>
+
+  <h2>2. Signaler (US19, US20)</h2>
+  <p style="font-size:12px;color:#6b7280;margin:0">Cliquez sur la carte pour placer la position.</p>
+  <div class="row">
+    <div><label>Espece</label><input id="species" value="chien"></div>
+    <div><label>Categorie</label>
+      <select id="category">
+        <option>BLESSE</option><option>MALADE</option><option>ABANDONNE</option>
+        <option>PERDU</option><option>MALTRAITE</option><option>AUTRE</option>
+      </select>
+    </div>
+  </div>
+  <label>Description</label><textarea id="description" rows="2">Chien blesse a la patte</textarea>
+  <div class="row">
+    <div><label>Gravite (1-5)</label><input id="severity" type="number" min="1" max="5" value="3"></div>
+    <div><label>Latitude</label><input id="lat" value="48.8566"></div>
+    <div><label>Longitude</label><input id="lng" value="2.3522"></div>
+  </div>
+  <label>Photo (JPEG / PNG, 5 Mo max)</label><input id="photo" type="file" accept="image/jpeg,image/png">
+  <button onclick="createReport()">Envoyer le signalement</button>
+
+  <h2>3. Signalements proches (US22)</h2>
+  <div class="row">
+    <div><label>Rayon (km)</label><input id="radius" type="number" value="5"></div>
+    <div><label>Statut</label>
+      <select id="nearStatus"><option value="">Actifs</option><option>NOUVEAU</option><option>QUALIFIE</option></select>
+    </div>
+  </div>
+  <button class="secondary" onclick="loadNearby()">Chercher autour du centre de la carte</button>
+  <div id="nearby"></div>
+
+  <div id="msg"></div>
+</aside>
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+  let token = null;
+  const map = L.map('map').setView([48.8566, 2.3522], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, attribution: '&copy; OpenStreetMap'
+  }).addTo(map);
+  const layer = L.layerGroup().addTo(map);
+  const colors = { NOUVEAU: '#dc2626', QUALIFIE: '#f59e0b', ATTRIBUE: '#2563eb', EN_COURS: '#7c3aed', TERMINE: '#059669', REJETE: '#6b7280' };
+  let pin = null;
+
+  map.on('click', e => {
+    document.getElementById('lat').value = e.latlng.lat.toFixed(6);
+    document.getElementById('lng').value = e.latlng.lng.toFixed(6);
+    if (pin) pin.remove();
+    pin = L.marker(e.latlng).addTo(map);
+  });
+  map.on('moveend', () => token && loadMap());
+
+  const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  const esc = value => String(value ?? '').replace(/[&<>"']/g, c => HTML_ESCAPES[c]);
+
+  function show(text, ok) {
+    const el = document.getElementById('msg');
+    el.className = ok ? 'ok' : 'err';
+    el.textContent = text;
+  }
+
+  async function api(path, options = {}) {
+    if (!token) { show('Obtenez d\'abord un jeton (etape 1)', false); throw new Error('no token'); }
+    options.headers = Object.assign({ Authorization: 'Bearer ' + token }, options.headers || {});
+    const res = await fetch(path, options);
+    const body = res.headers.get('content-type')?.includes('json') ? await res.json() : null;
+    if (!res.ok) {
+      show(res.status + ' : ' + (body?.message || res.statusText) + (body?.details ? '\n' + JSON.stringify(body.details) : ''), false);
+      throw new Error(res.status);
+    }
+    return body;
+  }
+
+  async function login() {
+    const userId = document.getElementById('userId').value;
+    const role = document.getElementById('role').value;
+    const res = await fetch(`/api/dev/token?userId=${userId}&roles=${role}`);
+    token = (await res.json()).token;
+    document.getElementById('who').textContent = `Connecte : utilisateur ${userId} (${role})`;
+    show('Jeton obtenu', true);
+    loadMap();
+  }
+
+  async function createReport() {
+    const form = new FormData();
+    ['species', 'category', 'description', 'severity'].forEach(id => form.append(id, document.getElementById(id).value));
+    form.append('latitude', document.getElementById('lat').value);
+    form.append('longitude', document.getElementById('lng').value);
+    const file = document.getElementById('photo').files[0];
+    if (file) form.append('photo', file);
+    const r = await api('/api/reports', { method: 'POST', body: form });
+    show(`Signalement #${r.id} cree (statut ${r.status}, priorite ${r.priorityScore})`, true);
+    loadMap();
+  }
+
+  async function loadMap() {
+    const b = map.getBounds();
+    const bbox = [b.getSouth(), b.getWest(), b.getNorth(), b.getEast()].map(v => v.toFixed(5)).join(',');
+    const reports = await api('/api/reports?bbox=' + bbox);
+    layer.clearLayers();
+    reports.forEach(r => {
+      const marker = L.circleMarker([r.latitude, r.longitude], {
+        radius: 6 + r.severity * 2, color: colors[r.status] || '#000', fillOpacity: 0.6
+      });
+      marker.bindPopup(popupHtml(r));
+      marker.addTo(layer);
+    });
+  }
+
+  function popupHtml(r) {
+    return `<div class="popup"><b>#${r.id} ${esc(r.species)}</b> (${esc(r.category)})<br>
+      Statut : <b>${esc(r.status)}</b> - gravite ${r.severity} - priorite ${r.priorityScore}<br>
+      <img src="${esc(r.photoUrl)}" alt="photo">
+      <button onclick="act(${r.id}, 'QUALIFIE')">Qualifier</button>
+      <button onclick="accept(${r.id})">Accepter la mission</button>
+      <button onclick="act(${r.id}, 'EN_COURS')">En cours</button>
+      <button onclick="act(${r.id}, 'TERMINE')">Terminer</button>
+      <button class="secondary" onclick="showHistory(${r.id})">Historique</button>
+      <button class="secondary" onclick="hide(${r.id})">Masquer (admin)</button></div>`;
+  }
+
+  async function act(id, status) {
+    const r = await api(`/api/reports/${id}/status`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status, comment: 'Depuis la carte' })
+    });
+    show(`#${id} -> ${r.status}`, true);
+    loadMap();
+  }
+
+  async function accept(id) {
+    const r = await api(`/api/reports/${id}/accept`, { method: 'POST' });
+    show(`Mission #${id} acceptee : ${r.status}`, true);
+    loadMap();
+  }
+
+  async function showHistory(id) {
+    const h = await api(`/api/reports/${id}/history`);
+    show(h.map(x => `${x.changedAt} : ${x.fromStatus || '-'} -> ${x.toStatus} (par ${x.actorId}) ${x.comment || ''}`).join('\n'), true);
+  }
+
+  async function hide(id) {
+    const reason = prompt('Motif du masquage ?');
+    if (!reason) return;
+    await api(`/api/admin/reports/${id}/hide`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ reason })
+    });
+    show(`#${id} masque`, true);
+    loadMap();
+  }
+
+  async function loadNearby() {
+    const c = map.getCenter();
+    const status = document.getElementById('nearStatus').value;
+    const radius = document.getElementById('radius').value;
+    const list = await api(`/api/reports/nearby?lat=${c.lat}&lng=${c.lng}&radiusKm=${radius}` + (status ? `&status=${status}` : ''));
+    document.getElementById('nearby').innerHTML = list.length
+      ? list.map(r => `<div class="item"><b>#${r.id} ${esc(r.species)}</b> - ${esc(r.status)}<br>${r.distanceMeters} m - priorite ${r.priorityScore}</div>`).join('')
+      : '<div class="item">Aucun signalement dans ce rayon</div>';
+  }
+</script>
+</body>
+</html>

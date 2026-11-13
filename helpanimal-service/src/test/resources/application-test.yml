@@ -1,0 +1,7 @@
+# Profil des tests : port gRPC aleatoire pour le stub, photos dans target/
+rescue:
+  stub:
+    port: 0
+helpanimal:
+  storage:
+    directory: target/test-uploads
