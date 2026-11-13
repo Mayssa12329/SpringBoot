@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MEDIVET - Interface de Test E01 Utilisateurs</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --warning: #d97706;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text);
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 20px;
+            border-bottom: 2px solid var(--border);
+            margin-bottom: 24px;
+        }
+
+        .header-title h1 {
+            font-size: 26px;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-title p {
+            color: var(--text-muted);
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        .session-badge {
+            background: #e0e7ff;
+            color: #3730a3;
+            padding: 8px 16px;
+            border-radius: 9999px;
+            font-size: 14px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .session-badge.admin {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .session-badge.connected {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-header h2 {
+            font-size: 17px;
+            font-weight: 700;
+        }
+
+        .tag {
+            font-size: 11px;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 6px;
+            text-transform: uppercase;
+        }
+
+        .tag.blue { background: #dbeafe; color: #1e40af; }
+        .tag.green { background: #dcfce7; color: #15803d; }
+        .tag.amber { background: #fef3c7; color: #b45309; }
+        .tag.purple { background: #f3e8ff; color: #7e22ce; }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-muted);
+        }
+
+        input, select {
+            width: 100%;
+            padding: 9px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--primary);
+        }
+
+        .btn {
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+            gap: 6px;
+            width: 100%;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+
+        .btn-success { background: var(--success); color: white; }
+        .btn-success:hover { background: #15803d; }
+
+        .btn-danger { background: var(--danger); color: white; }
+        .btn-danger:hover { background: #b91c1c; }
+
+        .btn-secondary { background: #e2e8f0; color: #334155; }
+        .btn-secondary:hover { background: #cbd5e1; }
+
+        .btn-row {
+            display: flex;
+            gap: 8px;
+        }
+
+        .quick-fill {
+            font-size: 12px;
+            color: var(--primary);
+            cursor: pointer;
+            text-decoration: underline;
+            margin-left: auto;
+        }
+
+        /* Users Table */
+        .table-container {
+            overflow-x: auto;
+            margin-top: 12px;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        th, td {
+            padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+            text-align: left;
+        }
+
+        th {
+            background: #f1f5f9;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+        }
+
+        /* Console Log Box */
+        .console-card {
+            background: #0f172a;
+            color: #f8fafc;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .console-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #334155;
+            padding-bottom: 8px;
+            margin-bottom: 10px;
+        }
+
+        .console-header h3 {
+            font-size: 14px;
+            color: #94a3b8;
+            font-family: monospace;
+        }
+
+        .console-output {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            max-height: 180px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            color: #38bdf8;
+        }
+
+        .token-display {
+            background: #f1f5f9;
+            border: 1px dashed #cbd5e1;
+            padding: 8px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-family: monospace;
+            word-break: break-all;
+            margin-top: 8px;
+            color: #475569;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="header-title">
+            <h1>🐾 MEDIVET - Testeur E01 (Utilisateurs)</h1>
+            <p>Interface interactive pour tester les User Stories US01 à US05 directement sur le backend Spring Boot.</p>
+        </div>
+        <div id="sessionBadge" class="session-badge">
+            <span>⚪ Non connecté</span>
+        </div>
+    </header>
+
+    <div class="grid">
+        <!-- ============================================== -->
+        <!-- US01 : CRÉER UN COMPTE                         -->
+        <!-- ============================================== -->
+        <div class="card">
+            <div class="card-header">
+                <h2>US01 - Créer un compte</h2>
+                <span class="tag blue">POST /api/auth/inscription</span>
+            </div>
+            <div style="display:flex; justify-content:flex-end; margin-bottom:8px;">
+                <span class="quick-fill" onclick="remplirInscriptionTest()">Remplir auto</span>
+            </div>
+            <div class="form-group">
+                <label>Nom</label>
+                <input type="text" id="regNom" placeholder="ex: Dupont">
+            </div>
+            <div class="form-group">
+                <label>Prénom</label>
+                <input type="text" id="regPrenom" placeholder="ex: Jean">
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="regEmail" placeholder="jean@mail.com">
+            </div>
+            <div class="form-group">
+                <label>Mot de passe</label>
+                <input type="password" id="regMdp" placeholder="Au moins 6 caractères">
+            </div>
+            <div class="form-group">
+                <label>Téléphone</label>
+                <input type="text" id="regTel" placeholder="0612345678">
+            </div>
+            <button class="btn btn-primary" onclick="creerCompte()">Créer le compte</button>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- US02 : SE CONNECTER / SE DÉCONNECTER           -->
+        <!-- ============================================== -->
+        <div class="card">
+            <div class="card-header">
+                <h2>US02 - Connexion / Déconnexion</h2>
+                <span class="tag green">POST /api/auth/connexion</span>
+            </div>
+            <div class="btn-row" style="margin-bottom: 12px;">
+                <button class="btn btn-secondary" onclick="remplirConnexionAdmin()" style="font-size:12px;">⚡ Admin démo</button>
+                <button class="btn btn-secondary" onclick="remplirConnexionUser()" style="font-size:12px;">⚡ Utilisateur test</button>
+            </div>
+            <div class="form-group">
+                <label>Email</label>
+                <input type="email" id="loginEmail" placeholder="email@exemple.com">
+            </div>
+            <div class="form-group">
+                <label>Mot de passe</label>
+                <input type="password" id="loginMdp" placeholder="Votre mot de passe">
+            </div>
+            <div class="btn-row">
+                <button class="btn btn-success" onclick="seConnecter()">Se connecter</button>
+                <button class="btn btn-danger" onclick="seDeconnecter()">Déconnexion</button>
+            </div>
+
+            <div style="margin-top: 12px;">
+                <label>Token JWT stocké :</label>
+                <div id="tokenDisplay" class="token-display">Aucun token (Non connecté)</div>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- US03 : MODIFIER SON PROFIL                     -->
+        <!-- ============================================== -->
+        <div class="card">
+            <div class="card-header">
+                <h2>US03 - Mon Profil</h2>
+                <span class="tag purple">PUT /api/utilisateurs/moi</span>
+            </div>
+            <p style="font-size:12px; color:var(--text-muted); margin-bottom:12px;">Nécessite d'être connecté (JWT Bearer Token).</p>
+            <button class="btn btn-secondary" style="margin-bottom:12px;" onclick="chargerMonProfil()">🔄 Recharger mes infos</button>
+            <div class="form-group">
+                <label>Nom</label>
+                <input type="text" id="profNom">
+            </div>
+            <div class="form-group">
+                <label>Prénom</label>
+                <input type="text" id="profPrenom">
+            </div>
+            <div class="form-group">
+                <label>Téléphone</label>
+                <input type="text" id="profTel">
+            </div>
+            <button class="btn btn-primary" onclick="modifierMonProfil()">Enregistrer les modifications</button>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- US04 : ATTRIBUER DES RÔLES (ADMIN)             -->
+        <!-- ============================================== -->
+        <div class="card">
+            <div class="card-header">
+                <h2>US04 - Gestion des Rôles</h2>
+                <span class="tag amber">ADMINISTRATEUR</span>
+            </div>
+            <p style="font-size:12px; color:var(--text-muted); margin-bottom:8px;">Réservé à l'ADMIN (connectez-vous avec admin@medivet.com).</p>
+            <button class="btn btn-secondary" onclick="chargerTousLesUtilisateurs()">📋 Voir tous les utilisateurs</button>
+            
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Nom</th>
+                            <th>Email</th>
+                            <th>Rôle</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody">
+                        <tr><td colspan="4" style="text-align:center; color:var(--text-muted);">Cliquez sur "Voir tous les utilisateurs"</td></tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div style="margin-top:14px; border-top:1px solid var(--border); padding-top:10px;">
+                <label>Attribuer un nouveau rôle :</label>
+                <div class="btn-row" style="margin-top: 6px;">
+                    <input type="number" id="roleUserId" placeholder="User ID" style="width: 35%;">
+                    <select id="roleSelect" style="width: 40%;">
+                        <option value="UTILISATEUR">UTILISATEUR</option>
+                        <option value="VETERINAIRE">VETERINAIRE</option>
+                        <option value="ADMINISTRATEUR">ADMINISTRATEUR</option>
+                    </select>
+                    <button class="btn btn-primary" style="width: 25%;" onclick="attribuerRole()">OK</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================== -->
+        <!-- US05 : RÉCUPÉRER MOT DE PASSE                  -->
+        <!-- ============================================== -->
+        <div class="card" style="grid-column: 1 / -1;">
+            <div class="card-header">
+                <h2>US05 - Récupérer son mot de passe</h2>
+                <span class="tag blue">POST /api/auth/*</span>
+            </div>
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px;">
+                <!-- Étape 1 -->
+                <div>
+                    <h3 style="font-size: 14px; margin-bottom: 8px;">Étape 1 : Demander le token</h3>
+                    <div class="form-group">
+                        <label>Email du compte</label>
+                        <input type="email" id="resetEmail" placeholder="jean@mail.com">
+                    </div>
+                    <button class="btn btn-secondary" onclick="demanderResetMdp()">Obtenir le Token</button>
+                </div>
+                <!-- Étape 2 -->
+                <div>
+                    <h3 style="font-size: 14px; margin-bottom: 8px;">Étape 2 : Réinitialiser le mot de passe</h3>
+                    <div class="form-group">
+                        <label>Token UUID reçu</label>
+                        <input type="text" id="resetToken" placeholder="Collez le token généré">
+                    </div>
+                    <div class="form-group">
+                        <label>Nouveau mot de passe</label>
+                        <input type="password" id="resetNouveauMdp" placeholder="Nouveau mot de passe">
+                    </div>
+                    <button class="btn btn-success" onclick="appliquerNouveauMdp()">Changer le mot de passe</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Console Log & Retour API -->
+    <div class="console-card">
+        <div class="console-header">
+            <h3>📡 Journal des Requêtes API (Live Console)</h3>
+            <span style="font-size:12px; color:#94a3b8; cursor:pointer;" onclick="document.getElementById('consoleOutput').innerText = 'Prêt pour les requêtes...';">Effacer</span>
+        </div>
+        <div id="consoleOutput" class="console-output">Prêt pour les requêtes...</div>
+    </div>
+</div>
+
+<script>
+    // Variables globales
+    const BASE_URL = window.location.origin.includes('http') ? window.location.origin : 'http://localhost:8080';
+    let currentToken = localStorage.getItem('medivet_token') || null;
+    let currentUser = JSON.parse(localStorage.getItem('medivet_user') || 'null');
+
+    // Initialisation
+    window.onload = function() {
+        mettreAJourSessionBadge();
+        if (currentToken) {
+            document.getElementById('tokenDisplay').innerText = currentToken;
+        }
+    };
+
+    function logConsole(method, endpoint, status, data) {
+        const consoleBox = document.getElementById('consoleOutput');
+        const timestamp = new Date().toLocaleTimeString();
+        const formattedData = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+        const msg = `[${timestamp}] ${method} ${endpoint} → HTTP ${status}\n${formattedData}\n--------------------------------------------------\n`;
+        consoleBox.innerText = msg + consoleBox.innerText;
+    }
+
+    function mettreAJourSessionBadge() {
+        const badge = document.getElementById('sessionBadge');
+        if (!currentToken || !currentUser) {
+            badge.className = 'session-badge';
+            badge.innerHTML = '⚪ Non connecté';
+            document.getElementById('tokenDisplay').innerText = 'Aucun token (Non connecté)';
+            return;
+        }
+
+        if (currentUser.role === 'ADMINISTRATEUR') {
+            badge.className = 'session-badge admin';
+            badge.innerHTML = `👑 Connecté : ${currentUser.prenom} (${currentUser.role})`;
+        } else {
+            badge.className = 'session-badge connected';
+            badge.innerHTML = `🟢 Connecté : ${currentUser.prenom} (${currentUser.role})`;
+        }
+        document.getElementById('tokenDisplay').innerText = currentToken;
+    }
+
+    // ==========================================
+    // US01 : Inscription
+    // ==========================================
+    function remplirInscriptionTest() {
+        const rnd = Math.floor(Math.random() * 1000);
+        document.getElementById('regNom').value = 'Test';
+        document.getElementById('regPrenom').value = 'User' + rnd;
+        document.getElementById('regEmail').value = `user${rnd}@medivet.com`;
+        document.getElementById('regMdp').value = '123456';
+        document.getElementById('regTel').value = '0612345678';
+    }
+
+    async function creerCompte() {
+        const body = {
+            nom: document.getElementById('regNom').value,
+            prenom: document.getElementById('regPrenom').value,
+            email: document.getElementById('regEmail').value,
+            motDePasse: document.getElementById('regMdp').value,
+            telephone: document.getElementById('regTel').value
+        };
+
+        try {
+            const res = await fetch(`${BASE_URL}/api/auth/inscription`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            const text = await res.text();
+            logConsole('POST', '/api/auth/inscription', res.status, text);
+            alert(res.ok ? 'Succès : ' + text : 'Erreur (' + res.status + ') : ' + text);
+        } catch (err) {
+            logConsole('POST', '/api/auth/inscription', 'ERR', err.message);
+        }
+    }
+
+    // ==========================================
+    // US02 : Connexion / Déconnexion
+    // ==========================================
+    function remplirConnexionAdmin() {
+        document.getElementById('loginEmail').value = 'admin@medivet.com';
+        document.getElementById('loginMdp').value = 'Admin1234!';
+    }
+
+    function remplirConnexionUser() {
+        document.getElementById('loginEmail').value = document.getElementById('regEmail').value || 'jean@mail.com';
+        document.getElementById('loginMdp').value = document.getElementById('regMdp').value || '123456';
+    }
+
+    async function seConnecter() {
+        const body = {
+            email: document.getElementById('loginEmail').value,
+            motDePasse: document.getElementById('loginMdp').value
+        };
+
+        try {
+            const res = await fetch(`${BASE_URL}/api/auth/connexion`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                currentToken = data.token;
+                currentUser = data;
+                localStorage.setItem('medivet_token', currentToken);
+                localStorage.setItem('medivet_user', JSON.stringify(currentUser));
+                logConsole('POST', '/api/auth/connexion', res.status, data);
+                mettreAJourSessionBadge();
+                chargerMonProfil();
+                alert(`Connexion réussie ! Bienvenue ${data.prenom} (${data.role})`);
+            } else {
+                const err = await res.text();
+                logConsole('POST', '/api/auth/connexion', res.status, err);
+                alert('Échec connexion : ' + err);
+            }
+        } catch (err) {
+            logConsole('POST', '/api/auth/connexion', 'ERR', err.message);
+        }
+    }
+
+    function seDeconnecter() {
+        currentToken = null;
+        currentUser = null;
+        localStorage.removeItem('medivet_token');
+        localStorage.removeItem('medivet_user');
+        mettreAJourSessionBadge();
+        logConsole('ACTION', 'Déconnexion locale', 200, 'Token supprimé.');
+        alert('Déconnexion effectuée.');
+    }
+
+    // ==========================================
+    // US03 : Profil
+    // ==========================================
+    async function chargerMonProfil() {
+        if (!currentToken) {
+            alert("Veuillez d'abord vous connecter.");
+            return;
+        }
+
+        try {
+            const res = await fetch(`${BASE_URL}/api/utilisateurs/moi`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${currentToken}` }
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById('profNom').value = data.nom || '';
+                document.getElementById('profPrenom').value = data.prenom || '';
+                document.getElementById('profTel').value = data.telephone || '';
+                logConsole('GET', '/api/utilisateurs/moi', res.status, data);
+            } else {
+                const err = await res.text();
+                logConsole('GET', '/api/utilisateurs/moi', res.status, err);
+            }
+        } catch (err) {
+            logConsole('GET', '/api/utilisateurs/moi', 'ERR', err.message);
+        }
+    }
+
+    async function modifierMonProfil() {
+        if (!currentToken) {
+            alert("Veuillez d'abord vous connecter.");
+            return;
+        }
+
+        const body = {
+            nom: document.getElementById('profNom').value,
+            prenom: document.getElementById('profPrenom').value,
+            telephone: document.getElementById('profTel').value
+        };
+
+        try {
+            const res = await fetch(`${BASE_URL}/api/utilisateurs/moi`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${currentToken}`
+                },
+                body: JSON.stringify(body)
+            });
+
+            const text = await res.text();
+            logConsole('PUT', '/api/utilisateurs/moi', res.status, text);
+            alert(res.ok ? 'Profil mis à jour !' : 'Erreur : ' + text);
+        } catch (err) {
+            logConsole('PUT', '/api/utilisateurs/moi', 'ERR', err.message);
+        }
+    }
+
+    // ==========================================
+    // US04 : Attribution des Rôles (Admin)
+    // ==========================================
+    async function chargerTousLesUtilisateurs() {
+        if (!currentToken) {
+            alert("Connectez-vous en tant qu'ADMINISTRATEUR.");
+            return;
+        }
+
+        try {
+            const res = await fetch(`${BASE_URL}/api/utilisateurs`, {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${currentToken}` }
+            });
+
+            if (res.ok) {
+                const users = await res.json();
+                logConsole('GET', '/api/utilisateurs', res.status, users);
+
+                const tbody = document.getElementById('usersTableBody');
+                tbody.innerHTML = '';
+                users.forEach(u => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><strong>${u.id}</strong></td>
+                        <td>${u.nom} ${u.prenom}</td>
+                        <td>${u.email}</td>
+                        <td><span class="tag ${u.role === 'ADMINISTRATEUR' ? 'amber' : (u.role === 'VETERINAIRE' ? 'purple' : 'blue')}">${u.role}</span></td>
+                    `;
+                    row.style.cursor = 'pointer';
+                    row.title = 'Cliquez pour sélectionner cet ID';
+                    row.onclick = () => {
+                        document.getElementById('roleUserId').value = u.id;
+                        document.getElementById('roleSelect').value = u.role;
+                    };
+                    tbody.appendChild(row);
+                });
+            } else {
+                const err = await res.text();
+                logConsole('GET', '/api/utilisateurs', res.status, err);
+                alert("Accès refusé : vous devez être ADMINISTRATEUR pour voir la liste.");
+            }
+        } catch (err) {
+            logConsole('GET', '/api/utilisateurs', 'ERR', err.message);
+        }
+    }
+
+    async function attribuerRole() {
+        const id = document.getElementById('roleUserId').value;
+        const role = document.getElementById('roleSelect').value;
+
+        if (!id) {
+            alert("Veuillez spécifier un User ID.");
+            return;
+        }
+
+        try {
+            const res = await fetch(`${BASE_URL}/api/utilisateurs/${id}/role`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${currentToken}`
+                },
+                body: JSON.stringify({ role: role })
+            });
+
+            const text = await res.text();
+            logConsole('PUT', `/api/utilisateurs/${id}/role`, res.status, text);
+            alert(res.ok ? `Rôle mis à jour (${role}) !` : 'Erreur : ' + text);
+            if (res.ok) {
+                chargerTousLesUtilisateurs();
+            }
+        } catch (err) {
+            logConsole('PUT', `/api/utilisateurs/${id}/role`, 'ERR', err.message);
+        }
+    }
+
+    // ==========================================
+    // US05 : Mot de passe oublié
+    // ==========================================
+    async function demanderResetMdp() {
+        const email = document.getElementById('resetEmail').value;
+        if (!email) {
+            alert("Entrez un email.");
+            return;
+        }
+
+        try {
+            const res = await fetch(`${BASE_URL}/api/auth/mot-de-passe-oublie`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email })
+            });
+
+            const text = await res.text();
+            logConsole('POST', '/api/auth/mot-de-passe-oublie', res.status, text);
+
+            // Extraire automatiquement le token si renvoyé
+            if (text.includes("Token de réinitialisation : ")) {
+                const token = text.replace("Token de réinitialisation : ", "").trim();
+                document.getElementById('resetToken').value = token;
+                alert("Token récupéré et pré-rempli dans l'étape 2 !");
+            } else {
+                alert(text);
+            }
+        } catch (err) {
+            logConsole('POST', '/api/auth/mot-de-passe-oublie', 'ERR', err.message);
+        }
+    }
+
+    async function appliquerNouveauMdp() {
+        const body = {
+            token: document.getElementById('resetToken').value,
+            nouveauMotDePasse: document.getElementById('resetNouveauMdp').value
+        };
+
+        if (!body.token || !body.nouveauMotDePasse) {
+            alert("Token et nouveau mot de passe requis.");
+            return;
+        }
+
+        try {
+            const res = await fetch(`${BASE_URL}/api/auth/reinitialiser-mot-de-passe`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+
+            const text = await res.text();
+            logConsole('POST', '/api/auth/reinitialiser-mot-de-passe', res.status, text);
+            alert(res.ok ? text : 'Erreur : ' + text);
+        } catch (err) {
+            logConsole('POST', '/api/auth/reinitialiser-mot-de-passe', 'ERR', err.message);
+        }
+    }
+</script>
+
+</body>
+</html>
