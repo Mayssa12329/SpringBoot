@@ -12,20 +12,22 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./src/main/resources/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U medivet_user -d medivet_db"]
       interval: 5s
       timeout: 5s
       retries: 5
 
-  # Service Application : Spring Boot (Java 21)
-  app:
+  # Service Application : PetPass (Spring Boot)
+  petpass:
     build: .
-    container_name: medivet-app
+    container_name: petpass
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "8081:8081"
     environment:
+      SERVER_PORT: 8081
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/medivet_db
       SPRING_DATASOURCE_USERNAME: medivet_user
       SPRING_DATASOURCE_PASSWORD: medivet_password
