@@ -11,7 +11,8 @@ services:
       POSTGRES_USER: medivet_user
       POSTGRES_PASSWORD: medivet_password
     ports:
-      - "5432:5432"
+      # 5434 sur le poste (5432 est souvent deja pris par un PostgreSQL local) -> 5432 dans le conteneur
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./src/main/resources/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
