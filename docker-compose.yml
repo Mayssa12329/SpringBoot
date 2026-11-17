@@ -93,9 +93,37 @@ services:
     networks:
       - medivet-network
 
+  # ============================================================
+  # Microservice 4 : HelpAnimal - Signalements (Port 8084)
+  # REST -> RescueCoordination (gRPC, stub local en S3) ; REST -> PetPass
+  # ============================================================
+  helpanimal-service:
+    build:
+      context: .
+      dockerfile: src/main/java/com/medivet/helpanimal/Dockerfile
+    container_name: helpanimal-service
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      SERVER_PORT: 8084
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/medivet_db
+      SPRING_DATASOURCE_USERNAME: medivet_user
+      SPRING_DATASOURCE_PASSWORD: medivet_password
+      PETPASS_SERVICE_URL: http://petpass-service:8082
+      RESCUE_STUB_ENABLED: "true"
+    volumes:
+      - helpanimal_photos:/app/helpanimal-photos
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - medivet-network
+
 networks:
   medivet-network:
     driver: bridge
 
 volumes:
   postgres_data:
+  helpanimal_photos:

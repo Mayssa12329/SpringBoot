@@ -1,0 +1,623 @@
+package com.medivet.helpanimal.web;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasSize;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import javax.imageio.ImageIO;
+
+import com.jayway.jsonpath.JsonPath;
+import com.medivet.authentification.user.model.User;
+import com.medivet.authentification.user.repository.UserRepository;
+import com.medivet.helpanimal.exception.MissionAlreadyAssignedException;
+import com.medivet.helpanimal.repository.AuditLogRepository;
+import com.medivet.helpanimal.security.CurrentUser;
+import com.medivet.helpanimal.security.Role;
+import com.medivet.helpanimal.service.AcceptMissionService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
+
+/**
+ * Tests de bout en bout de l'API (US19 a US25) dans l'application MediVet complete :
+ * base H2, securite et utilisateurs de UserService, stub gRPC sur un port aleatoire.
+ */
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+class ReportApiIntegrationTest {
+
+    private static final AtomicInteger AREA = new AtomicInteger();
+
+    @Autowired
+    private MockMvc mvc;
+
+    @Autowired
+    private AcceptMissionService acceptMissionService;
+
+    @Autowired
+    private AuditLogRepository auditLogRepository;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    // ------------------------------------------------------------------ outils
+
+    /** Requete faite par l'utilisateur de test n (cree dans UserService au besoin), avec ce role. */
+    private RequestPostProcessor as(long n, Role role) {
+        return user(ensureUser(n, role, "inutilise").getEmail()).roles(role.name());
+    }
+
+    /** Identifiant reel, dans UserService, de l'utilisateur de test n. */
+    private long uid(long n) {
+        return userRepository.findByEmail(email(n)).orElseThrow().getId();
+    }
+
+    private User ensureUser(long n, Role role, String password) {
+        return userRepository.findByEmail(email(n)).orElseGet(() -> {
+            User user = new User();
+            user.setNom("Test");
+            user.setPrenom("Utilisateur " + n);
+            user.setEmail(email(n));
+            user.setMotDePasse(passwordEncoder.encode(password));
+            user.setTelephone("0000000000");
+            user.setRole(com.medivet.authentification.user.model.Role.valueOf(role.name()));
+            return userRepository.save(user);
+        });
+    }
+
+    private static String email(long n) {
+        return "helpanimal-test-" + n + "@medivet.test";
+    }
+
+    private static byte[] png() throws Exception {
+        BufferedImage image = new BufferedImage(20, 20, BufferedImage.TYPE_INT_RGB);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        ImageIO.write(image, "png", out);
+        return out.toByteArray();
+    }
+
+    private static MockMultipartFile photo() throws Exception {
+        return new MockMultipartFile("photo", "chien.png", "image/png", png());
+    }
+
+    /** Chaque test travaille dans sa propre zone pour ne pas declencher RM02 par accident. */
+    private static double[] newArea() {
+        int n = AREA.incrementAndGet();
+        return new double[] {44.0 + n * 0.1, 1.0 + n * 0.1};
+    }
+
+    private long createReport(long userId, String species, double lat, double lng, int severity) throws Exception {
+        String json = mvc.perform(multipart("/api/v1/reports")
+                .file(photo())
+                .param("species", species)
+                .param("category", "BLESSE")
+                .param("description", "Animal blesse")
+                .param("severity", String.valueOf(severity))
+                .param("latitude", String.valueOf(lat))
+                .param("longitude", String.valueOf(lng))
+                .with(as(userId, Role.UTILISATEUR)))
+            .andExpect(status().isCreated())
+            .andReturn().getResponse().getContentAsString();
+        return ((Number) JsonPath.read(json, "$.id")).longValue();
+    }
+
+    private void setStatus(long id, String status, long userId, Role role) throws Exception {
+        mvc.perform(patch("/api/v1/reports/{id}/status", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"status\":\"" + status + "\",\"comment\":\"test\"}")
+                .with(as(userId, role)))
+            .andExpect(status().isOk());
+    }
+
+    // ------------------------------------------------------------------ US19
+
+    @Test
+    void us19_creationAvecPhoto() throws Exception {
+        double[] p = newArea();
+        mvc.perform(multipart("/api/v1/reports")
+                .file(photo())
+                .param("species", "Chien")
+                .param("category", "BLESSE")
+                .param("description", "Chien blesse a la patte")
+                .param("severity", "4")
+                .param("latitude", String.valueOf(p[0]))
+                .param("longitude", String.valueOf(p[1]))
+                .with(as(1, Role.UTILISATEUR)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.status").value("NOUVEAU"))
+            .andExpect(jsonPath("$.species").value("chien"))
+            .andExpect(jsonPath("$.photoUrl").value(org.hamcrest.Matchers.startsWith("/helpanimal/photos/")))
+            .andExpect(jsonPath("$.history", hasSize(1)));
+    }
+
+    @Test
+    void us19_pdfRefuse() throws Exception {
+        double[] p = newArea();
+        MockMultipartFile pdf = new MockMultipartFile("photo", "doc.pdf", "application/pdf", new byte[] {1, 2, 3});
+        mvc.perform(multipart("/api/v1/reports").file(pdf)
+                .param("species", "chat").param("category", "BLESSE").param("description", "x")
+                .param("severity", "3").param("latitude", String.valueOf(p[0])).param("longitude", String.valueOf(p[1]))
+                .with(as(1, Role.UTILISATEUR)))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void us19_faussePhotoRefusee() throws Exception {
+        double[] p = newArea();
+        MockMultipartFile fake = new MockMultipartFile("photo", "x.png", "image/png", "pas une image".getBytes());
+        mvc.perform(multipart("/api/v1/reports").file(fake)
+                .param("species", "chat").param("category", "BLESSE").param("description", "x")
+                .param("severity", "3").param("latitude", String.valueOf(p[0])).param("longitude", String.valueOf(p[1]))
+                .with(as(1, Role.UTILISATEUR)))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void us19_photoTropLourde413() throws Exception {
+        double[] p = newArea();
+        MockMultipartFile big = new MockMultipartFile("photo", "big.png", "image/png", new byte[6 * 1024 * 1024]);
+        mvc.perform(multipart("/api/v1/reports").file(big)
+                .param("species", "chat").param("category", "BLESSE").param("description", "x")
+                .param("severity", "3").param("latitude", String.valueOf(p[0])).param("longitude", String.valueOf(p[1]))
+                .with(as(1, Role.UTILISATEUR)))
+            .andExpect(status().isPayloadTooLarge());
+    }
+
+    @Test
+    void us19_photoManquante400() throws Exception {
+        double[] p = newArea();
+        mvc.perform(multipart("/api/v1/reports")
+                .param("species", "chat").param("category", "BLESSE").param("description", "x")
+                .param("severity", "3").param("latitude", String.valueOf(p[0])).param("longitude", String.valueOf(p[1]))
+                .with(as(1, Role.UTILISATEUR)))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void sansJeton401() throws Exception {
+        mvc.perform(get("/api/v1/reports")).andExpect(status().isUnauthorized());
+    }
+
+    /** Chaine complete avec UserService : connexion -> jeton JWT -> appel HelpAnimal avec le role. */
+    @Test
+    void connexionUserServicePuisAppelHelpAnimal() throws Exception {
+        ensureUser(800, Role.VETERINAIRE, "Secret123!");
+        ensureUser(801, Role.UTILISATEUR, "Secret123!");
+
+        String vetToken = login(email(800), "Secret123!");
+        mvc.perform(get("/api/v1/reports/nearby").param("lat", "45").param("lng", "2")
+                .header("Authorization", "Bearer " + vetToken))
+            .andExpect(status().isOk());
+
+        String citizenToken = login(email(801), "Secret123!");
+        mvc.perform(get("/api/v1/reports/nearby").param("lat", "45").param("lng", "2")
+                .header("Authorization", "Bearer " + citizenToken))
+            .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/reports/mine").header("Authorization", "Bearer " + citizenToken))
+            .andExpect(status().isOk());
+    }
+
+    @Test
+    void jetonInvalide401() throws Exception {
+        mvc.perform(get("/api/v1/reports").header("Authorization", "Bearer pas-un-jeton"))
+            .andExpect(status().isUnauthorized());
+    }
+
+    private String login(String email, String password) throws Exception {
+        String json = mvc.perform(post("/api/auth/connexion")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"email\":\"" + email + "\",\"motDePasse\":\"" + password + "\"}"))
+            .andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString();
+        return JsonPath.read(json, "$.token");
+    }
+
+    // ------------------------------------------------------------------ US20 + RM02
+
+    @Test
+    void us20_latitudeInvalide400() throws Exception {
+        mvc.perform(multipart("/api/v1/reports").file(photo())
+                .param("species", "chat").param("category", "BLESSE").param("description", "x")
+                .param("severity", "3").param("latitude", "120").param("longitude", "2")
+                .with(as(1, Role.UTILISATEUR)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.details.fields.latitude").exists());
+    }
+
+    @Test
+    void us20_positionCorrigeeParLAuteur() throws Exception {
+        double[] p = newArea();
+        long id = createReport(5, "chien", p[0], p[1], 3);
+
+        mvc.perform(patch("/api/v1/reports/{id}/location", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"latitude\":" + (p[0] + 0.001) + ",\"longitude\":" + p[1] + "}")
+                .with(as(5, Role.UTILISATEUR)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.latitude").value(p[0] + 0.001));
+
+        mvc.perform(patch("/api/v1/reports/{id}/location", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"latitude\":" + p[0] + ",\"longitude\":" + p[1] + "}")
+                .with(as(6, Role.UTILISATEUR)))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void rm02_doublonA50MetresRefuse() throws Exception {
+        double[] p = newArea();
+        long existing = createReport(1, "chien", p[0], p[1], 3);
+        double lat50m = p[0] + 50.0 / 111_320;
+
+        mvc.perform(multipart("/api/v1/reports").file(photo())
+                .param("species", "chien").param("category", "BLESSE").param("description", "meme chien")
+                .param("severity", "3").param("latitude", String.valueOf(lat50m)).param("longitude", String.valueOf(p[1]))
+                .with(as(2, Role.UTILISATEUR)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.details.existingReportId").value(existing));
+    }
+
+    @Test
+    void rm02_pasDeDoublonA150MetresNiAutreEspece() throws Exception {
+        double[] p = newArea();
+        createReport(1, "chien", p[0], p[1], 3);
+
+        createReport(2, "chien", p[0] + 150.0 / 111_320, p[1], 3);
+        createReport(3, "chat", p[0], p[1], 3);
+    }
+
+    @Test
+    void rm02_deplacementSurUnSignalementActifRefuse() throws Exception {
+        double[] p = newArea();
+        long existing = createReport(1, "chien", p[0], p[1], 3);
+        double farLat = p[0] + 0.01;
+        long moved = createReport(1, "chien", farLat, p[1], 3);
+
+        mvc.perform(patch("/api/v1/reports/{id}/location", moved)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"latitude\":" + p[0] + ",\"longitude\":" + p[1] + "}")
+                .with(as(1, Role.UTILISATEUR)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.details.existingReportId").value(existing));
+
+        mvc.perform(get("/api/v1/reports/{id}", moved).with(as(1, Role.UTILISATEUR)))
+            .andExpect(jsonPath("$.latitude").value(farLat));
+    }
+
+    @Test
+    void rm02_unSignalementNEstPasSonPropreDoublon() throws Exception {
+        double[] p = newArea();
+        long id = createReport(1, "chien", p[0], p[1], 3);
+        double lat20m = p[0] + 20.0 / 111_320;
+
+        mvc.perform(patch("/api/v1/reports/{id}/location", id)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"latitude\":" + lat20m + ",\"longitude\":" + p[1] + "}")
+                .with(as(1, Role.UTILISATEUR)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.latitude").value(lat20m));
+    }
+
+    // ------------------------------------------------------------------ US21 + RM01
+
+    @Test
+    void us21_carteTrieeParPrioriteEtSansMasques() throws Exception {
+        double[] p = newArea();
+        long faible = createReport(1, "lapin", p[0], p[1], 2);
+        long grave = createReport(1, "chat", p[0] + 0.01, p[1], 5);
+        long masque = createReport(1, "oiseau", p[0] + 0.02, p[1], 5);
+        mvc.perform(patch("/api/v1/admin/reports/{id}/hide", masque)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"abus\"}")
+                .with(as(99, Role.ADMINISTRATEUR)))
+            .andExpect(status().isOk());
+
+        String bbox = (p[0] - 0.05) + "," + (p[1] - 0.05) + "," + (p[0] + 0.05) + "," + (p[1] + 0.05);
+        mvc.perform(get("/api/v1/reports").param("bbox", bbox).with(as(1, Role.UTILISATEUR)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", hasSize(2)))
+            .andExpect(jsonPath("$[0].id").value(grave))
+            .andExpect(jsonPath("$[1].id").value(faible));
+
+        mvc.perform(get("/api/v1/reports").param("bbox", bbox).param("species", "chat").with(as(1, Role.UTILISATEUR)))
+            .andExpect(jsonPath("$", hasSize(1)));
+    }
+
+    // ------------------------------------------------------------------ US22
+
+    @Test
+    void us22_procheFiltreParDistance() throws Exception {
+        double[] p = newArea();
+        long pres = createReport(1, "chien", p[0] + 0.01, p[1], 3);      // ~1,1 km
+        createReport(1, "chat", p[0] + 0.08, p[1], 3);                   // ~8,9 km
+
+        mvc.perform(get("/api/v1/reports/nearby")
+                .param("lat", String.valueOf(p[0])).param("lng", String.valueOf(p[1])).param("radiusKm", "5")
+                .with(as(7, Role.VETERINAIRE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", hasSize(1)))
+            .andExpect(jsonPath("$[0].id").value(pres))
+            .andExpect(jsonPath("$[0].distanceMeters").exists());
+    }
+
+    @Test
+    void us22_citoyenInterdit() throws Exception {
+        mvc.perform(get("/api/v1/reports/nearby").param("lat", "45").param("lng", "2").with(as(1, Role.UTILISATEUR)))
+            .andExpect(status().isForbidden());
+    }
+
+    // ------------------------------------------------------------------ US23 + RM04
+
+    @Test
+    void us23_accepterUneMissionQualifiee() throws Exception {
+        double[] p = newArea();
+        long id = createReport(1, "chien", p[0], p[1], 4);
+        setStatus(id, "QUALIFIE", 7, Role.VETERINAIRE);
+
+        mvc.perform(post("/api/v1/reports/{id}/accept", id).with(as(20, Role.VETERINAIRE)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("ATTRIBUE"))
+            .andExpect(jsonPath("$.assigneeId").value(uid(20)));
+
+        mvc.perform(post("/api/v1/reports/{id}/accept", id).with(as(21, Role.VETERINAIRE)))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value("Mission deja attribuee"));
+    }
+
+    @Test
+    void us23_nouveauNonAcceptable() throws Exception {
+        double[] p = newArea();
+        long id = createReport(1, "chien", p[0], p[1], 4);
+
+        mvc.perform(post("/api/v1/reports/{id}/accept", id).with(as(20, Role.VETERINAIRE)))
+            .andExpect(status().isConflict());
+    }
+
+    @Test
+    void us23_citoyenNePeutPasAccepter() throws Exception {
+        double[] p = newArea();
+        long id = createReport(1, "chien", p[0], p[1], 4);
+        setStatus(id, "QUALIFIE", 7, Role.VETERINAIRE);
+
+        mvc.perform(post("/api/v1/reports/{id}/accept", id).with(as(2, Role.UTILISATEUR)))
+            .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void rm04_deuxAcceptationsSimultaneesUneSeuleGagne() throws Exception {
+        double[] p = newArea();
+        long id = createReport(1, "chien", p[0], p[1], 5);
+        setStatus(id, "QUALIFIE", 7, Role.VETERINAIRE);
+
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        List<Callable<Boolean>> tasks = new ArrayList<>();
+        for (long intervenant : new long[] {30L, 31L}) {
+            tasks.add(() -> {
+                start.await();
+                try {
+                    acceptMissionService.accept(id, new CurrentUser(intervenant, EnumSet.of(Role.VETERINAIRE)));
+                    return true;
+                } catch (MissionAlreadyAssignedException e) {
+                    return false;
+                }
+            });
+        }
+        List<Future<Boolean>> futures = new ArrayList<>();
+        for (Callable<Boolean> task : tasks) {
+            futures.add(pool.submit(task));
+        }
+        start.countDown();
+
+        int success = 0;
+        for (Future<Boolean> f : futures) {
+            if (f.get()) {
+                success++;
+            }
+        }
+        pool.shutdown();
+        assertThat(success).isEqualTo(1);
+    }
+
+    // ------------------------------------------------------------------ US24 + RM03
+
+    @Test
+    void us24_cheminCompletEtHistorique() throws Exception {
+        double[] p = newArea();
+        long id = createReport(1, "chien", p[0], p[1], 4);
+        setStatus(id, "QUALIFIE", 7, Role.VETERINAIRE);
+        mvc.perform(post("/api/v1/reports/{id}/accept", id).with(as(20, Role.VETERINAIRE))).andExpect(status().isOk());
+        setStatus(id, "EN_COURS", 20, Role.VETERINAIRE);
+        setStatus(id, "TERMINE", 20, Role.VETERINAIRE);
+
+        mvc.perform(get("/api/v1/reports/{id}/history", id).with(as(1, Role.UTILISATEUR)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", hasSize(5)))
+            .andExpect(jsonPath("$[*].toStatus", hasItem("TERMINE")));
+    }
+
+    @Test
+    void us24_transitionInvalide409EtEtatInchange() throws Exception {
+        double[] p = newArea();
+        long id = createReport(1, "chien", p[0], p[1], 4);
+
+        mvc.perform(patch("/api/v1/reports/{id}/status", id)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"TERMINE\"}")
+                .with(as(99, Role.ADMINISTRATEUR)))
+            .andExpect(status().isConflict());
+
+        mvc.perform(get("/api/v1/reports/{id}", id).with(as(1, Role.UTILISATEUR)))
+            .andExpect(jsonPath("$.status").value("NOUVEAU"));
+    }
+
+    @Test
+    void us24_historiqueSelonLesDroits() throws Exception {
+        double[] p = newArea();
+        long id = createReport(1, "chien", p[0], p[1], 4);
+
+        mvc.perform(get("/api/v1/reports/{id}/history", id).with(as(2, Role.UTILISATEUR)))
+            .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/reports/{id}", id).with(as(2, Role.UTILISATEUR)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("NOUVEAU"))
+            .andExpect(jsonPath("$.history").doesNotExist());
+    }
+
+    @Test
+    void us24_seulLIntervenantAttribueFaitAvancer() throws Exception {
+        double[] p = newArea();
+        long id = createReport(1, "chien", p[0], p[1], 4);
+        setStatus(id, "QUALIFIE", 7, Role.VETERINAIRE);
+        mvc.perform(post("/api/v1/reports/{id}/accept", id).with(as(20, Role.VETERINAIRE))).andExpect(status().isOk());
+
+        mvc.perform(patch("/api/v1/reports/{id}/status", id)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"status\":\"EN_COURS\"}")
+                .with(as(21, Role.VETERINAIRE)))
+            .andExpect(status().isForbidden());
+    }
+
+    // ------------------------------------------------------------------ Mes signalements
+
+    @Test
+    void mesSignalements_seulementLesMiensEtSansMasques() throws Exception {
+        double[] p = newArea();
+        long userId = 5000L + AREA.get();
+        long mine = createReport(userId, "chien", p[0], p[1], 2);
+        long hidden = createReport(userId, "chat", p[0], p[1], 2);
+        createReport(userId + 1, "lapin", p[0], p[1], 2);
+
+        mvc.perform(patch("/api/v1/admin/reports/{id}/hide", hidden)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"abus\"}")
+                .with(as(99, Role.ADMINISTRATEUR)))
+            .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/reports/mine").with(as(userId, Role.UTILISATEUR)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$", hasSize(1)))
+            .andExpect(jsonPath("$[0].id").value(mine));
+    }
+
+    // ------------------------------------------------------------------ US25 + RM15
+
+    @Test
+    void us25_masquageMotiveEtAudite() throws Exception {
+        double[] p = newArea();
+        long id = createReport(1, "chien", p[0], p[1], 2);
+        long auditsBefore = auditLogRepository.count();
+
+        mvc.perform(patch("/api/v1/admin/reports/{id}/hide", id)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Photo sans animal\"}")
+                .with(as(99, Role.ADMINISTRATEUR)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("MASQUE"));
+
+        assertThat(auditLogRepository.count()).isEqualTo(auditsBefore + 1);
+        assertThat(auditLogRepository.findByTargetTypeAndTargetIdOrderByCreatedAtAsc("REPORT", id))
+            .anySatisfy(a -> {
+                assertThat(a.getAction()).isEqualTo("REPORT_HIDDEN");
+                assertThat(a.getActorId()).isEqualTo(uid(99));
+                assertThat(a.getDetails()).isEqualTo("Photo sans animal");
+            });
+
+        // Un signalement masque n'existe plus pour les autres utilisateurs
+        mvc.perform(get("/api/v1/reports/{id}", id).with(as(1, Role.UTILISATEUR)))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void us25_photoMasqueeInaccessibleSaufAdmin() throws Exception {
+        double[] p = newArea();
+        long id = createReport(1, "chien", p[0], p[1], 2);
+        String json = mvc.perform(get("/api/v1/reports/{id}", id).with(as(1, Role.UTILISATEUR)))
+            .andReturn().getResponse().getContentAsString();
+        String photoUrl = JsonPath.read(json, "$.photoUrl");
+
+        mvc.perform(get(photoUrl)).andExpect(status().isOk());
+
+        mvc.perform(patch("/api/v1/admin/reports/{id}/hide", id)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"Photo abusive\"}")
+                .with(as(99, Role.ADMINISTRATEUR)))
+            .andExpect(status().isOk());
+
+        mvc.perform(get(photoUrl)).andExpect(status().isNotFound());
+        mvc.perform(get(photoUrl).with(as(1, Role.UTILISATEUR))).andExpect(status().isNotFound());
+        mvc.perform(get(photoUrl).with(as(99, Role.ADMINISTRATEUR))).andExpect(status().isOk());
+    }
+
+    @Test
+    void us25_photoInconnueOuUrlVarianteRefusee() throws Exception {
+        double[] p = newArea();
+        long id = createReport(1, "chien", p[0], p[1], 2);
+        String json = mvc.perform(get("/api/v1/reports/{id}", id).with(as(1, Role.UTILISATEUR)))
+            .andReturn().getResponse().getContentAsString();
+        String photoUrl = JsonPath.read(json, "$.photoUrl");
+
+        mvc.perform(get("/helpanimal/photos/inconnue.png")).andExpect(status().isNotFound());
+        mvc.perform(get("/helpanimal/photos/" + photoUrl.substring("/helpanimal/photos/".length()).toUpperCase()))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void us25_motifObligatoire() throws Exception {
+        double[] p = newArea();
+        long id = createReport(1, "chien", p[0], p[1], 2);
+
+        mvc.perform(patch("/api/v1/admin/reports/{id}/hide", id)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\" \"}")
+                .with(as(99, Role.ADMINISTRATEUR)))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void us25_impossibleApresAttribution() throws Exception {
+        double[] p = newArea();
+        long id = createReport(1, "chien", p[0], p[1], 4);
+        setStatus(id, "QUALIFIE", 7, Role.VETERINAIRE);
+        mvc.perform(post("/api/v1/reports/{id}/accept", id).with(as(20, Role.VETERINAIRE))).andExpect(status().isOk());
+
+        mvc.perform(patch("/api/v1/admin/reports/{id}/hide", id)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"abus\"}")
+                .with(as(99, Role.ADMINISTRATEUR)))
+            .andExpect(status().isConflict());
+    }
+
+    @Test
+    void us25_reserveALAdmin() throws Exception {
+        double[] p = newArea();
+        long id = createReport(1, "chien", p[0], p[1], 2);
+
+        mvc.perform(patch("/api/v1/admin/reports/{id}/hide", id)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"reason\":\"abus\"}")
+                .with(as(7, Role.VETERINAIRE)))
+            .andExpect(status().isForbidden());
+    }
+}

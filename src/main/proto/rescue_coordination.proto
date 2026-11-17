@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package medivet.rescue.v1;
+
+option java_multiple_files = true;
+option java_package = "com.medivet.rescue.grpc";
+option java_outer_classname = "RescueCoordinationProto";
+
+// Contrat entre HelpAnimalService (client) et RescueCoordinationService (serveur).
+// En S3, un stub local implemente ce service. En S5, on pointe vers le vrai service.
+service RescueCoordination {
+  rpc AssignMission (AssignMissionRequest) returns (AssignMissionResponse);
+}
+
+message AssignMissionRequest {
+  string report_id = 1;
+  string intervenant_id = 2;
+  double latitude = 3;
+  double longitude = 4;
+  int32 severity = 5;
+}
+
+message AssignMissionResponse {
+  enum Result {
+    ASSIGNED = 0;
+    ALREADY_ASSIGNED = 1;
+    REJECTED = 2;
+  }
+  Result result = 1;
+  string mission_id = 2;
+  string message = 3;
+}

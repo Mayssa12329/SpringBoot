@@ -32,6 +32,9 @@ build/
 ### VS Code ###
 .vscode/
 
+### Photos des signalements HelpAnimal (donnees locales) ###
+helpanimal-photos/
+
 ### Logs ###
 *.log
 
