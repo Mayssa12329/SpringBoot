@@ -1,5 +1,7 @@
 services:
-  # Service Base de données : PostgreSQL 16
+  # ============================================================
+  # Base de données mutualisée : PostgreSQL 16
+  # ============================================================
   postgres:
     image: postgres:16-alpine
     container_name: medivet-postgres
@@ -18,11 +20,17 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - medivet-network
 
-  # Service Application : PetPass (Spring Boot)
-  petpass:
-    build: .
-    container_name: petpass
+  # ============================================================
+  # Microservice 1 : Authentification & Utilisateurs (Port 8081)
+  # ============================================================
+  auth-service:
+    build:
+      context: .
+      dockerfile: src/main/java/com/medivet/authentification/Dockerfile
+    container_name: auth-service
     restart: unless-stopped
     ports:
       - "8081:8081"
@@ -31,11 +39,63 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/medivet_db
       SPRING_DATASOURCE_USERNAME: medivet_user
       SPRING_DATASOURCE_PASSWORD: medivet_password
-      SPRING_JPA_HIBERNATE_DDL_AUTO: update
-      SPRING_JPA_PROPERTIES_HIBERNATE_DIALECT: org.hibernate.dialect.PostgreSQLDialect
+      PETPASS_SERVICE_URL: http://petpass-service:8082
+      VETBOOKING_SERVICE_URL: http://vetbooking-service:8083
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - medivet-network
+
+  # ============================================================
+  # Microservice 2 : PetPass - Santé Animale (Port 8082)
+  # ============================================================
+  petpass-service:
+    build:
+      context: .
+      dockerfile: src/main/java/com/medivet/petpass/Dockerfile
+    container_name: petpass-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      SERVER_PORT: 8082
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/medivet_db
+      SPRING_DATASOURCE_USERNAME: medivet_user
+      SPRING_DATASOURCE_PASSWORD: medivet_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - medivet-network
+
+  # ============================================================
+  # Microservice 3 : VetBooking - Rendez-vous (Port 8083)
+  # ============================================================
+  vetbooking-service:
+    build:
+      context: .
+      dockerfile: src/main/java/com/medivet/vetbooking/Dockerfile
+    container_name: vetbooking-service
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      SERVER_PORT: 8083
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/medivet_db
+      SPRING_DATASOURCE_USERNAME: medivet_user
+      SPRING_DATASOURCE_PASSWORD: medivet_password
+      PETPASS_SERVICE_URL: http://petpass-service:8082
+      AUTH_SERVICE_URL: http://auth-service:8081
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - medivet-network
+
+networks:
+  medivet-network:
+    driver: bridge
 
 volumes:
   postgres_data:

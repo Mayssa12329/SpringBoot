@@ -8,6 +8,11 @@ import com.medivet.petpass.dto.response.AnimalResponse;
 import com.medivet.petpass.service.AnimalService;
 import com.medivet.vetbooking.dto.response.AppointmentResponse;
 import com.medivet.vetbooking.service.AppointmentService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -24,6 +29,8 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/utilisateurs")
+@Tag(name = "1. Utilisateurs & Profils", description = "Gestion du profil, liaisons inter-services et administration (US03, US04)")
+@SecurityRequirement(name = "BearerAuth")
 public class UserController {
 
     private final UserService userService;
@@ -44,6 +51,11 @@ public class UserController {
     // Header requis : Authorization: Bearer <token>
     // ================================================================
     @GetMapping("/moi")
+    @Operation(summary = "Consulter son propre profil (US03)", description = "Retourne les informations du compte utilisateur connecté via son JWT")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Profil utilisateur retourné"),
+            @ApiResponse(responseCode = "401", description = "Non authentifié (Token JWT absent ou invalide)")
+    })
     public ResponseEntity<User> monProfil(Authentication auth) {
         String email = auth.getName();
         User user = userService.getUtilisateurParEmail(email);
@@ -55,6 +67,7 @@ public class UserController {
     // GET /api/utilisateurs/moi/animaux
     // ================================================================
     @GetMapping("/moi/animaux")
+    @Operation(summary = "Lister mes animaux enregistrés (Liaison PetPass)", description = "Récupère automatiquement la liste des animaux de l'utilisateur connecté sans passer d'ID")
     public ResponseEntity<List<AnimalResponse>> mesAnimaux(Authentication auth) {
         String email = auth.getName();
         User user = userService.getUtilisateurParEmail(email);
@@ -69,6 +82,7 @@ public class UserController {
     // GET /api/utilisateurs/moi/rendez-vous
     // ================================================================
     @GetMapping("/moi/rendez-vous")
+    @Operation(summary = "Lister mes rendez-vous (Liaison VetBooking)", description = "Récupère automatiquement l'historique des consultations prises par l'utilisateur connecté")
     public ResponseEntity<List<AppointmentResponse>> mesRendezVous(Authentication auth) {
         String email = auth.getName();
         User user = userService.getUtilisateurParEmail(email);
@@ -83,6 +97,7 @@ public class UserController {
     // PUT /api/utilisateurs/moi
     // ================================================================
     @PutMapping("/moi")
+    @Operation(summary = "Modifier son profil (US03)", description = "Met à jour le nom, prénom ou téléphone de l'utilisateur connecté")
     public ResponseEntity<String> modifierMonProfil(Authentication auth,
                                                      @Valid @RequestBody UpdateProfileRequest request) {
         String email = auth.getName();
@@ -96,6 +111,7 @@ public class UserController {
     // ================================================================
     @GetMapping
     @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @Operation(summary = "Lister tous les utilisateurs (Admin)", description = "Accessible uniquement par un utilisateur ayant le rôle ADMINISTRATEUR")
     public ResponseEntity<List<User>> listerTous() {
         return ResponseEntity.ok(userService.getTousLesUtilisateurs());
     }
@@ -106,6 +122,7 @@ public class UserController {
     // ================================================================
     @GetMapping("/en-attente-validation")
     @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @Operation(summary = "Consulter les candidatures vétérinaires en attente (Admin)", description = "Liste les professionnels inscrits dont le diplôme doit être validé")
     public ResponseEntity<List<User>> demandesVeterinairesEnAttente() {
         return ResponseEntity.ok(userService.getDemandesVeterinairesEnAttente());
     }
@@ -116,6 +133,7 @@ public class UserController {
     // ================================================================
     @PutMapping("/{id}/role")
     @PreAuthorize("hasRole('ADMINISTRATEUR')")
+    @Operation(summary = "Attribuer un rôle à un utilisateur (Admin)", description = "Permet à l'admin de promouvoir un utilisateur (ex: valider le rôle VETERINAIRE)")
     public ResponseEntity<String> attribuerRole(@PathVariable Long id,
                                                  @Valid @RequestBody AssignRoleRequest request) {
         userService.attribuerRole(id, request);
