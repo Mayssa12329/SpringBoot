@@ -12,7 +12,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-medivet}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-pedro}
       POSTGRES_DB: ${ADOPT_DB:-adoptanimal}
     volumes:
       - adopt-data:/var/lib/postgresql/data
@@ -31,7 +31,7 @@ services:
       SERVICE_NAME: adoptanimal
       SPRING_DATASOURCE_URL: jdbc:postgresql://adopt-db:5432/${ADOPT_DB:-adoptanimal}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-medivet}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-pedro}
       PETPASS_URL: ${PETPASS_URL:-http://petpass:8080}
       VETINTEROP_URL: ${VETINTEROP_URL:-http://vetinterop:8080/ws}
       SPRING_PROFILES_ACTIVE: ${ADOPT_PROFILE:-stub}

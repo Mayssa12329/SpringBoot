@@ -22,7 +22,7 @@ public class PetPassRestClient implements EligibiliteClient {
 
     private final RestClient restClient;
 
-    public PetPassRestClient(@Qualifier("petPassRestClient") RestClient restClient) {
+    public PetPassRestClient(@Qualifier("petPassApiClient") RestClient restClient) {
         this.restClient = restClient;
     }
 

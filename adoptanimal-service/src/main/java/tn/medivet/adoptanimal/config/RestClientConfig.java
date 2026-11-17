@@ -11,13 +11,13 @@ import org.springframework.web.client.RestClient;
 public class RestClientConfig {
 
     @Bean
-    public RestClient petPassRestClient(@Value("${petpass.url}") String url,
+    public RestClient petPassApiClient(@Value("${petpass.url}") String url,
                                         @Value("${petpass.timeout-ms}") int timeoutMs) {
         return construire(url, timeoutMs);
     }
 
     @Bean
-    public RestClient notificationRestClient(@Value("${notification.url}") String url,
+    public RestClient notificationApiClient(@Value("${notification.url}") String url,
                                              @Value("${notification.timeout-ms}") int timeoutMs) {
         return construire(url, timeoutMs);
     }

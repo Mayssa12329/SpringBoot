@@ -20,7 +20,7 @@ public class NotificationClient {
     private final RestClient restClient;
     private final boolean enabled;
 
-    public NotificationClient(@Qualifier("notificationRestClient") RestClient restClient,
+    public NotificationClient(@Qualifier("notificationApiClient") RestClient restClient,
                               @Value("${notification.enabled:false}") boolean enabled) {
         this.restClient = restClient;
         this.enabled = enabled;
