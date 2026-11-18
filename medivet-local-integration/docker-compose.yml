@@ -1,0 +1,145 @@
+services:
+  # ============================================================
+  # MICROSERVICE 1 : AUTHENTIFICATION & UTILISATEURS (Port 8081)
+  # ============================================================
+  auth-db:
+    image: postgres:16-alpine
+    container_name: medivet-auth-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: auth_user
+      POSTGRES_PASSWORD: auth_password
+    ports:
+      - "5431:5432"
+    volumes:
+      - auth_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_user -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medivet-network
+
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: auth-service
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      SERVER_PORT: 8081
+      SPRING_DATASOURCE_URL: jdbc:postgresql://auth-db:5432/auth_db
+      SPRING_DATASOURCE_USERNAME: auth_user
+      SPRING_DATASOURCE_PASSWORD: auth_password
+      PETPASS_SERVICE_URL: http://petpass-service:8082
+      VETBOOKING_SERVICE_URL: http://vetbooking-service:8083
+    depends_on:
+      auth-db:
+        condition: service_healthy
+      petpass-service:
+        condition: service_started
+    networks:
+      - medivet-network
+
+  # ============================================================
+  # MICROSERVICE 2 : PETPASS - SANTÉ ANIMALE (Port 8082)
+  # ============================================================
+  petpass-db:
+    image: postgres:16-alpine
+    container_name: medivet-petpass-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: petpass_db
+      POSTGRES_USER: petpass_user
+      POSTGRES_PASSWORD: petpass_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - petpass_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U petpass_user -d petpass_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medivet-network
+
+  petpass-service:
+    build:
+      context: ./petpass-service
+      dockerfile: Dockerfile
+    container_name: petpass-service
+    restart: unless-stopped
+    ports:
+      - "8082:8082"
+    environment:
+      SERVER_PORT: 8082
+      SPRING_DATASOURCE_URL: jdbc:postgresql://petpass-db:5432/petpass_db
+      SPRING_DATASOURCE_USERNAME: petpass_user
+      SPRING_DATASOURCE_PASSWORD: petpass_password
+    depends_on:
+      petpass-db:
+        condition: service_healthy
+    networks:
+      - medivet-network
+
+  # ============================================================
+  # MICROSERVICE 3 : VETBOOKING - RENDEZ-VOUS (Port 8083)
+  # ============================================================
+  vetbooking-db:
+    image: postgres:16-alpine
+    container_name: medivet-vetbooking-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vetbooking_db
+      POSTGRES_USER: vetbooking_user
+      POSTGRES_PASSWORD: vetbooking_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - vetbooking_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vetbooking_user -d vetbooking_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medivet-network
+
+  vetbooking-service:
+    build:
+      context: ./vetbooking-service
+      dockerfile: Dockerfile
+    container_name: vetbooking-service
+    restart: unless-stopped
+    ports:
+      - "8083:8083"
+    environment:
+      SERVER_PORT: 8083
+      SPRING_DATASOURCE_URL: jdbc:postgresql://vetbooking-db:5432/vetbooking_db
+      SPRING_DATASOURCE_USERNAME: vetbooking_user
+      SPRING_DATASOURCE_PASSWORD: vetbooking_password
+      PETPASS_SERVICE_URL: http://petpass-service:8082
+      AUTH_SERVICE_URL: http://auth-service:8081
+    depends_on:
+      vetbooking-db:
+        condition: service_healthy
+      petpass-service:
+        condition: service_started
+      auth-service:
+        condition: service_started
+    networks:
+      - medivet-network
+
+networks:
+  medivet-network:
+    driver: bridge
+
+volumes:
+  auth_db_data:
+  petpass_db_data:
+  vetbooking_db_data:
