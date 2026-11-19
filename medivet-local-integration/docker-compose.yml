@@ -135,6 +135,61 @@ services:
     networks:
       - medivet-network
 
+  # ============================================================
+  # MICROSERVICE 4 : ADOPTANIMAL - ADOPTION (Port 8085)
+  # Base dédiée (database-per-service). PetPass réel (JWT transmis), VetInterop simulé
+  # tant que le service SOAP n'existe pas (mettre VETINTEROP_STUB à "false" ensuite).
+  # ============================================================
+  adopt-db:
+    image: postgres:16-alpine
+    container_name: medivet-adopt-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: adopt_db
+      POSTGRES_USER: adopt_user
+      POSTGRES_PASSWORD: adopt_password
+    ports:
+      - "5434:5432"
+    volumes:
+      - adopt_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adopt_user -d adopt_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medivet-network
+
+  adoptanimal-service:
+    build:
+      context: ./adoptanimal-service
+      dockerfile: Dockerfile
+    container_name: adoptanimal-service
+    restart: unless-stopped
+    ports:
+      - "8085:8080"
+    environment:
+      SERVICE_NAME: adoptanimal
+      SPRING_DATASOURCE_URL: jdbc:postgresql://adopt-db:5432/adopt_db
+      SPRING_DATASOURCE_USERNAME: adopt_user
+      SPRING_DATASOURCE_PASSWORD: adopt_password
+      PETPASS_URL: http://petpass-service:8082
+      PETPASS_STUB: "false"
+      VETINTEROP_STUB: "true"
+    depends_on:
+      adopt-db:
+        condition: service_healthy
+      petpass-service:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 40s
+    networks:
+      - medivet-network
+
 networks:
   medivet-network:
     driver: bridge
@@ -143,3 +198,4 @@ volumes:
   auth_db_data:
   petpass_db_data:
   vetbooking_db_data:
+  adopt_db_data:

@@ -1,0 +1,692 @@
+openapi: 3.0.3
+info:
+  title: AdoptAnimalService - Contrat REST
+  version: 1.0.0
+  description: |
+    Microservice **AdoptAnimal** de MediVet Connect : annonces d'adoption, candidatures,
+    rencontres et adoption finalisée (une seule adoption par animal).
+
+    **Règles métier**
+    - RM12 : une annonce n'est publiée que si l'identité de l'animal est `VERIFIED` (registre VetInterop)
+      et si l'animal est médicalement éligible (PetPass). Sinon : 422 avec la liste des motifs.
+      Une seule adoption finalisée par animal.
+    - RM13 : si PetPass ou VetInterop est indisponible (timeout 3 s, 2 reprises, circuit breaker),
+      l'annonce est créée avec le statut `VERIFICATION_EN_ATTENTE` ; elle est revérifiée via
+      `POST /annonces/{id}/verifications`.
+
+    **Cycles de vie**
+    - Candidature : `SOUMISE` -> `EN_EXAMEN` -> `ACCEPTEE` | `REFUSEE` (toute autre transition : 409).
+    - Rencontre : `PLANIFIEE` -> `EFFECTUEE` | `ANNULEE` (toute autre transition : 409).
+    - Annonce : `VERIFICATION_EN_ATTENTE` -> `ACTIVE` -> `CLOTUREE` (après adoption) ; `MASQUEE` réservé à la modération.
+
+    **Authentification** : l'API Gateway valide le JWT puis injecte l'identité de l'utilisateur dans
+    l'en-tête `X-User-Id`. Le service lui-même ne vérifie pas le jeton.
+  contact:
+    name: Équipe AdoptAnimal - MediVet Connect
+servers:
+  - url: https://gateway.medivet.local/api/v1
+    description: Via l'API Gateway (HTTPS)
+  - url: http://localhost:8080/api/v1
+    description: Local (service seul)
+  - url: http://localhost:8085/api/v1
+    description: Docker Compose
+tags:
+  - name: Annonces
+    description: Publication et recherche d'annonces d'adoption (US27, US28)
+  - name: Candidatures
+    description: Candidatures et décisions des refuges (US29, US30)
+  - name: Rencontres
+    description: Rencontres entre candidat et animal (US31)
+  - name: Adoption
+    description: Finalisation de l'adoption (US32)
+
+paths:
+  /annonces:
+    post:
+      tags: [Annonces]
+      operationId: publierAnnonce
+      summary: Publier une annonce d'adoption (US27)
+      description: |
+        Vérifie l'identité de l'animal (SOAP VetInterop) et son éligibilité médicale (REST PetPass).
+        - Tout est conforme : annonce `ACTIVE`.
+        - Un service externe est en panne : annonce `VERIFICATION_EN_ATTENTE` (201 quand même).
+        - Identité non vérifiée ou animal non éligible : 422 avec les motifs.
+      parameters:
+        - $ref: '#/components/parameters/XUserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnonceRequest'
+            example:
+              animalId: 1
+              puce: "250268500123456"
+              nom: Rex
+              espece: CHIEN
+              ageEstime: 3
+              localisation: Tunis
+              description: Chien calme, habitué aux enfants
+              photoUrl: https://example.org/rex.jpg
+              refugeId: 10
+      responses:
+        '201':
+          description: Annonce créée
+          headers:
+            Location:
+              description: URI de l'annonce créée
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnonceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/BadGateway'
+    get:
+      tags: [Annonces]
+      operationId: rechercherAnnonces
+      summary: Rechercher les annonces actives (US28)
+      description: Ne renvoie que les annonces `ACTIVE`, de la plus récente à la plus ancienne. Tous les filtres sont optionnels.
+      parameters:
+        - name: espece
+          in: query
+          description: Espèce exacte (insensible à la casse)
+          schema:
+            type: string
+          example: chien
+        - name: localisation
+          in: query
+          description: Texte contenu dans la localisation (insensible à la casse)
+          schema:
+            type: string
+          example: tunis
+        - name: ageMax
+          in: query
+          description: Âge estimé maximum (en années)
+          schema:
+            type: integer
+            minimum: 0
+          example: 5
+      responses:
+        '200':
+          description: Liste (éventuellement vide) des annonces actives
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnnonceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /annonces/{id}:
+    get:
+      tags: [Annonces]
+      operationId: consulterAnnonce
+      summary: Consulter une annonce
+      parameters:
+        - $ref: '#/components/parameters/AnnonceId'
+      responses:
+        '200':
+          description: Annonce trouvée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnonceResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /annonces/{id}/verifications:
+    post:
+      tags: [Annonces]
+      operationId: reverifierAnnonce
+      summary: Relancer la vérification d'une annonce en attente (RM13)
+      description: |
+        Rejoue les contrôles identité + éligibilité pour une annonce `VERIFICATION_EN_ATTENTE`.
+        Si tout est conforme, l'annonce passe à `ACTIVE`. Si un service reste indisponible, elle reste en attente (200).
+      parameters:
+        - $ref: '#/components/parameters/AnnonceId'
+        - $ref: '#/components/parameters/XUserId'
+      responses:
+        '200':
+          description: Annonce après revérification
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnonceResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /annonces/{annonceId}/candidatures:
+    post:
+      tags: [Candidatures]
+      operationId: soumettreCandidature
+      summary: Candidater à une annonce (US29)
+      description: |
+        Refusée (409) si l'animal est déjà adopté, si l'annonce n'est pas `ACTIVE`,
+        ou si le candidat a déjà une candidature active (`SOUMISE` ou `EN_EXAMEN`) sur cette annonce.
+      parameters:
+        - $ref: '#/components/parameters/AnnonceIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CandidatureRequest'
+            example:
+              candidatId: 100
+              commentaire: J'ai un jardin et de l'expérience avec les chiens.
+      responses:
+        '201':
+          description: Candidature créée (statut `SOUMISE`)
+          headers:
+            Location:
+              description: URI de la candidature créée
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CandidatureResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+    get:
+      tags: [Candidatures]
+      operationId: listerCandidatures
+      summary: Lister les candidatures d'une annonce
+      description: Triées de la plus ancienne à la plus récente.
+      parameters:
+        - $ref: '#/components/parameters/AnnonceIdPath'
+      responses:
+        '200':
+          description: Candidatures de l'annonce
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CandidatureResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /candidatures/{id}/statut:
+    put:
+      tags: [Candidatures]
+      operationId: changerStatutCandidature
+      summary: Examiner, accepter ou refuser une candidature (US30)
+      description: |
+        Transitions autorisées : `SOUMISE` -> `EN_EXAMEN` ; `EN_EXAMEN` -> `ACCEPTEE` ou `REFUSEE`.
+        Toute autre transition renvoie 409. Un événement de notification est émis (non bloquant)
+        pour `ACCEPTEE` et `REFUSEE`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identifiant de la candidature
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/XUserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StatutCandidatureRequest'
+            example:
+              statut: EN_EXAMEN
+              commentaire: Dossier reçu, entretien à prévoir
+      responses:
+        '200':
+          description: Candidature mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CandidatureResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /candidatures/{candidatureId}/rencontres:
+    post:
+      tags: [Rencontres]
+      operationId: planifierRencontre
+      summary: Planifier une rencontre (US31)
+      description: La candidature doit être `EN_EXAMEN` ou `ACCEPTEE`, sinon 409. La date doit être dans le futur.
+      parameters:
+        - name: candidatureId
+          in: path
+          required: true
+          description: Identifiant de la candidature
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/XUserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RencontreRequest'
+            example:
+              dateRencontre: "2030-01-15T10:00:00"
+      responses:
+        '201':
+          description: Rencontre planifiée (statut `PLANIFIEE`)
+          headers:
+            Location:
+              description: URI de la rencontre créée
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RencontreResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /rencontres/{id}/statut:
+    put:
+      tags: [Rencontres]
+      operationId: changerStatutRencontre
+      summary: Marquer une rencontre effectuée ou annulée
+      description: Seule la transition `PLANIFIEE` -> `EFFECTUEE` ou `ANNULEE` est autorisée, sinon 409.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Identifiant de la rencontre
+          schema:
+            type: integer
+            format: int64
+        - $ref: '#/components/parameters/XUserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StatutRencontreRequest'
+            example:
+              statut: EFFECTUEE
+      responses:
+        '200':
+          description: Rencontre mise à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RencontreResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /annonces/{annonceId}/adoption:
+    post:
+      tags: [Adoption]
+      operationId: finaliserAdoption
+      summary: Finaliser l'adoption (US32)
+      description: |
+        Conditions : annonce `ACTIVE`, candidature de cette annonce `ACCEPTEE` et au moins une
+        rencontre `EFFECTUEE` pour cette candidature (sinon 422 avec les motifs).
+
+        Effets : annonce passée en `CLOTUREE`, toutes les autres candidatures refusées automatiquement,
+        notifications émises (non bloquantes).
+
+        **Unicité (RM12)** : une seule adoption par animal. Une seconde finalisation, y compris
+        concurrente, reçoit 409.
+      parameters:
+        - $ref: '#/components/parameters/AnnonceIdPath'
+        - $ref: '#/components/parameters/XUserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdoptionRequest'
+            example:
+              candidatureId: 1
+      responses:
+        '201':
+          description: Adoption finalisée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdoptionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+components:
+  parameters:
+    XUserId:
+      name: X-User-Id
+      in: header
+      required: false
+      description: Identifiant de l'utilisateur authentifié, injecté par l'API Gateway à partir du JWT. Sert à l'historique d'audit.
+      schema:
+        type: integer
+        format: int64
+      example: 10
+    AnnonceId:
+      name: id
+      in: path
+      required: true
+      description: Identifiant de l'annonce
+      schema:
+        type: integer
+        format: int64
+    AnnonceIdPath:
+      name: annonceId
+      in: path
+      required: true
+      description: Identifiant de l'annonce
+      schema:
+        type: integer
+        format: int64
+
+  schemas:
+    StatutAnnonce:
+      type: string
+      enum: [VERIFICATION_EN_ATTENTE, ACTIVE, CLOTUREE, MASQUEE]
+    StatutCandidature:
+      type: string
+      enum: [SOUMISE, EN_EXAMEN, ACCEPTEE, REFUSEE]
+    StatutRencontre:
+      type: string
+      enum: [PLANIFIEE, EFFECTUEE, ANNULEE]
+
+    AnnonceRequest:
+      type: object
+      required: [animalId, puce, nom, espece, refugeId]
+      properties:
+        animalId:
+          type: integer
+          format: int64
+          description: Identifiant de l'animal dans PetPass
+        puce:
+          type: string
+          pattern: '^\d{15}$'
+          description: Numéro de puce électronique (exactement 15 chiffres)
+          example: "250268500123456"
+        nom:
+          type: string
+          maxLength: 100
+        espece:
+          type: string
+          maxLength: 50
+        ageEstime:
+          type: integer
+          minimum: 0
+          description: Âge estimé en années
+        localisation:
+          type: string
+          maxLength: 150
+        description:
+          type: string
+          maxLength: 1000
+        photoUrl:
+          type: string
+          maxLength: 500
+        refugeId:
+          type: integer
+          format: int64
+          description: Identifiant du refuge (UserService)
+
+    AnnonceResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        animalId:
+          type: integer
+          format: int64
+        puce:
+          type: string
+        nom:
+          type: string
+        espece:
+          type: string
+        ageEstime:
+          type: integer
+          nullable: true
+        localisation:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+        photoUrl:
+          type: string
+          nullable: true
+        refugeId:
+          type: integer
+          format: int64
+        statut:
+          $ref: '#/components/schemas/StatutAnnonce'
+        createdAt:
+          type: string
+          format: date-time
+
+    CandidatureRequest:
+      type: object
+      required: [candidatId]
+      properties:
+        candidatId:
+          type: integer
+          format: int64
+          description: Identifiant du candidat (UserService)
+        commentaire:
+          type: string
+          maxLength: 500
+
+    CandidatureResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        annonceId:
+          type: integer
+          format: int64
+        candidatId:
+          type: integer
+          format: int64
+        statut:
+          $ref: '#/components/schemas/StatutCandidature'
+        commentaire:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    StatutCandidatureRequest:
+      type: object
+      required: [statut]
+      properties:
+        statut:
+          $ref: '#/components/schemas/StatutCandidature'
+        commentaire:
+          type: string
+          maxLength: 500
+
+    RencontreRequest:
+      type: object
+      required: [dateRencontre]
+      properties:
+        dateRencontre:
+          type: string
+          format: date-time
+          description: Date et heure de la rencontre (doit être dans le futur)
+          example: "2030-01-15T10:00:00"
+
+    RencontreResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        candidatureId:
+          type: integer
+          format: int64
+        dateRencontre:
+          type: string
+          format: date-time
+        statut:
+          $ref: '#/components/schemas/StatutRencontre'
+
+    StatutRencontreRequest:
+      type: object
+      required: [statut]
+      properties:
+        statut:
+          $ref: '#/components/schemas/StatutRencontre'
+
+    AdoptionRequest:
+      type: object
+      required: [candidatureId]
+      properties:
+        candidatureId:
+          type: integer
+          format: int64
+          description: Candidature retenue (doit être `ACCEPTEE` avec une rencontre `EFFECTUEE`)
+
+    AdoptionResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        annonceId:
+          type: integer
+          format: int64
+        candidatureId:
+          type: integer
+          format: int64
+        finaliseeLe:
+          type: string
+          format: date-time
+
+    ApiError:
+      type: object
+      description: Format unique de toutes les erreurs de l'API
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        status:
+          type: integer
+          example: 409
+        error:
+          type: string
+          example: Conflict
+        message:
+          type: string
+          example: L'adoption de cet animal est déjà finalisée
+        details:
+          type: array
+          description: Motifs détaillés (erreurs de validation, motifs d'inéligibilité...)
+          items:
+            type: string
+        path:
+          type: string
+          example: /api/v1/annonces/1/adoption
+
+  responses:
+    BadRequest:
+      description: Données invalides, JSON illisible ou paramètre de mauvais type
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: "2030-01-01T09:00:00Z"
+            status: 400
+            error: Bad Request
+            message: Données invalides
+            details: ["puce : la puce doit contenir exactement 15 chiffres"]
+            path: /api/v1/annonces
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: "2030-01-01T09:00:00Z"
+            status: 404
+            error: Not Found
+            message: Annonce 99 introuvable
+            details: []
+            path: /api/v1/annonces/99
+    Conflict:
+      description: Conflit avec l'état actuel (transition invalide, doublon, adoption déjà finalisée, conflit de concurrence)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: "2030-01-01T09:00:00Z"
+            status: 409
+            error: Conflict
+            message: L'adoption de cet animal est déjà finalisée
+            details: []
+            path: /api/v1/annonces/1/adoption
+    UnprocessableEntity:
+      description: Règle métier non respectée (identité non vérifiée, animal non éligible, conditions de finalisation manquantes)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            timestamp: "2030-01-01T09:00:00Z"
+            status: 422
+            error: Unprocessable Entity
+            message: Règle métier non respectée
+            details: ["Une rencontre effectuée est requise avant la finalisation"]
+            path: /api/v1/annonces/1/adoption
+    BadGateway:
+      description: Le registre VetInterop a rejeté la requête SOAP (Fault client)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+    InternalError:
+      description: Erreur interne inattendue
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'

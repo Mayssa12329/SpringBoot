@@ -1,0 +1,8 @@
+# Profil "stub" : PetPass et VetInterop simulés localement (SPRING_PROFILES_ACTIVE=stub)
+petpass:
+  stub: ${PETPASS_STUB:true}
+vetinterop:
+  stub: ${VETINTEROP_STUB:true}
+logging:
+  level:
+    tn.medivet.adoptanimal.client: DEBUG
