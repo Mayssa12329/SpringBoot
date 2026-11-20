@@ -11,41 +11,57 @@ Projet réalisé par une équipe de **6 ingénieurs** selon la méthodologie **A
 Le système repose sur une architecture **microservices polyglotte en protocoles** (REST, gRPC, SOAP) où chaque service est strictement propriétaire de ses données et de ses règles métier.
 
 ```
-                              ┌────────────────────────┐
-                              │  Client Web / Mobile   │
-                              └───────────┬────────────┘
-                                          │  HTTP / REST
-                                          ▼
-                         ┌─────────────────────────────────┐
-                         │   API Gateway (Spring Cloud)    │
-                         │   Routage /api/v1, Sécurité JWT │
-                         └────┬───────────┬───────────┬────┘
-                              │           │           │
-       ┌──────────────────────┼───────────┼───────────┼──────────────────────┐
-       │ (REST)               │ (REST)    │ (REST)    │ (REST)               │ (REST)
-       ▼                      ▼           ▼           ▼                      ▼
-┌──────────────┐     ┌─────────────┐ ┌─────────┐ ┌─────────────┐     ┌──────────────┐
-│ UserService  │     │ PetPass     │ │ Vet-    │ │ HelpAnimal  │     │ AdoptAnimal  │
-│ Auth / JWT   │     │ Dossier Méd.│ │ Booking │ │ Signalements│     │ Annonces &   │
-└──────────────┘     └──────┬──────┘ └────┬────┘ └──────┬──────┘     │ Candidatures │
-                            │             │             │            └──────┬───────┘
-                     (SOAP) │             │ (Événements)│ (gRPC)            │ (REST)
-                            ▼             │             ▼                   ▼
-                     ┌─────────────┐      │      ┌─────────────┐     ┌──────────────┐
-                     │ VetInterop  │      │      │ Rescue-     │     │ Notification │
-                     │ Registre Ext│      │      │ Coordination│     │ Service      │
-                     └─────────────┘      │      └──────┬──────┘     └──────────────┘
-                                          │ (Événements)│ (Événements)
-                                          ▼             ▼
-                                  ┌─────────────────────────────┐
-                                  │     NotificationService     │
-                                  └─────────────────────────────┘
-                                                 ▲
-                                          (gRPC) │
-                                  ┌──────────────┴──────────────┐
-                                  │      VetPharmaService       │
-                                  │ Stocks & Réservations gRPC  │
-                                  └─────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                        Client Web / Mobile                          │
+└───────────────────────────────┬─────────────────────────────────────┘
+                                │  HTTP / REST
+                                ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│              API GATEWAY (Spring Cloud Gateway)                     │
+│         Routage /api/v1  •  Sécurité JWT (injecte X-User-Id)        │
+└───┬─────────┬─────────┬─────────┬─────────┬─────────┬───────────────┘
+    │  REST   │  REST   │  REST   │  REST   │  REST   │  REST
+    ▼         ▼         ▼         ▼         ▼         ▼
+┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌─────────────────┐
+│  User  │ │PetPass │ │Vet-    │ │ Help-  │ │  AdoptAnimal    │ ◀══ VOTRE SERVICE
+│Service │ │Service │ │Booking │ │ Animal │ │    Service      │
+│Auth/JWT│ │Dossier │ │ RDV    │ │Signale-│ │  Annonces &     │
+└───┬────┘ │médical │ │vétérin.│ │  ments │ │  candidatures   │
+    ▼      └───┬────┘ └───┬────┘ └───┬────┘ └────────┬────────┘
+ ╔═══════╗ ╔═══════╗ ╔═══════╗ ╔═══════╗       ╔═══════════╗
+ ║users- ║ ║petpass║ ║vbook- ║ ║help-  ║       ║ adopt-db  ║
+ ║  db   ║ ║  -db  ║ ║ ing-db║ ║animal-║       ║ PostgreSQL║
+ ╚═══════╝ ╚═══════╝ ╚═══════╝ ║  db   ║       ║  + Flyway ║
+                               ╚═══════╝       ╚═══════════╝
+
+   Chaque service possède SA PROPRE base (users-db, petpass-db,
+   vbooking-db, helpanimal-db, adopt-db, vetinterop-db,
+   notification-db, rescue-db, vetpharma-db)
+
+┌───────────────────── Services intermédiaires ─────────────────────┐
+│                                                                   │
+│   ┌───────────────┐        ┌────────────────────┐                 │
+│   │  VetInterop   │        │ Rescue-Coordination│                 │
+│   │ Registre ext. │        │ Affectation secours│                 │
+│   │               │        │                    │                 │
+│   │ SERVEUR SOAP  │        │  SERVEUR gRPC      │                 │
+│   │ (contract-    │        │  • RPC unaire      │                 │
+│   │  first: XSD + │        │  • RPC streaming   │                 │
+│   │  WSDL)        │        │                    │                 │
+│   └───────┬───────┘        └─────────┬──────────┘                 │
+│           │  ② SOAP                  │                           │
+│           │  ③ SOAP                  │                           │
+│   ┌───────┴──────────────────────────┴───────────┐               │
+│   │         NotificationService                  │              │
+│   │  (événements : adoption, rdv, signalement)    │              │
+│   └───────────────────┬───────────────────────────┘               │
+│                       ▲  gRPC                                     │
+│               ┌───────┴──────────────┐                            │
+│               │  VetPharmaService    │                            │
+│               │  Stocks médicaments  │                            │
+│               │  SERVEUR gRPC (unary)│                            │
+│               └──────────────────────┘                             │
+└────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
