@@ -1,0 +1,82 @@
+openapi: 3.0.3
+info:
+  title: HelpAnimal Service API
+  description: Microservice HelpAnimal - Signalement et Secours d'Animaux en Détresse
+  version: 1.0.0
+servers:
+  - url: http://localhost:8084
+    description: Serveur local
+paths:
+  /api/v1/reports:
+    get:
+      summary: Signalements pour la carte
+      tags:
+        - Reports
+      responses:
+        '200':
+          description: Liste des signalements
+    post:
+      summary: Signaler un animal en détresse
+      tags:
+        - Reports
+      responses:
+        '201':
+          description: Signalement créé
+  /api/v1/reports/mine:
+    get:
+      summary: Mes signalements
+      tags:
+        - Reports
+      responses:
+        '200':
+          description: Liste de mes signalements
+  /api/v1/reports/nearby:
+    get:
+      summary: Signalements proches
+      tags:
+        - Reports
+      responses:
+        '200':
+          description: Signalements à proximité
+  /api/v1/reports/{id}:
+    get:
+      summary: Détails d'un signalement
+      tags:
+        - Reports
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Détails du signalement
+  /api/v1/reports/{id}/accept:
+    post:
+      summary: Accepter une mission de sauvetage
+      tags:
+        - Reports
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Mission acceptée
+  /api/v1/reports/{id}/status:
+    patch:
+      summary: Faire avancer l'état du signalement
+      tags:
+        - Reports
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Statut mis à jour

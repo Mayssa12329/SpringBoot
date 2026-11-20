@@ -135,6 +135,106 @@ services:
     networks:
       - medivet-network
 
+  # ============================================================
+  # MICROSERVICE 4 : HELPANIMAL - SECOURS & SIGNALEMENTS (Port 8084)
+  # ============================================================
+  helpanimal-db:
+    image: postgres:16-alpine
+    container_name: medivet-helpanimal-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: helpanimal_db
+      POSTGRES_USER: helpanimal_user
+      POSTGRES_PASSWORD: helpanimal_password
+    ports:
+      - "5434:5432"
+    volumes:
+      - helpanimal_db_data:/var/lib/postgresql/data
+      - ./helpanimal-service/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U helpanimal_user -d helpanimal_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medivet-network
+
+  helpanimal-service:
+    build:
+      context: ./helpanimal-service
+      dockerfile: Dockerfile
+    container_name: helpanimal-service
+    restart: unless-stopped
+    ports:
+      - "8084:8084"
+    environment:
+      SERVER_PORT: 8084
+      SPRING_DATASOURCE_URL: jdbc:postgresql://helpanimal-db:5432/helpanimal_db
+      SPRING_DATASOURCE_USERNAME: helpanimal_user
+      SPRING_DATASOURCE_PASSWORD: helpanimal_password
+      PETPASS_SERVICE_URL: http://petpass-service:8082
+      AUTH_SERVICE_URL: http://auth-service:8081
+    volumes:
+      - helpanimal_photos:/app/helpanimal-photos
+    depends_on:
+      helpanimal-db:
+        condition: service_healthy
+      petpass-service:
+        condition: service_started
+    networks:
+      - medivet-network
+
+  # ============================================================
+  # MICROSERVICE 5 : ADOPTANIMAL - ADOPTIONS (Port 8085)
+  # ============================================================
+  adoptanimal-db:
+    image: postgres:16-alpine
+    container_name: medivet-adoptanimal-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: adoptanimal_db
+      POSTGRES_USER: adoptanimal_user
+      POSTGRES_PASSWORD: adoptanimal_password
+    ports:
+      - "5435:5432"
+    volumes:
+      - adoptanimal_db_data:/var/lib/postgresql/data
+      - ./adoptanimal-service/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U adoptanimal_user -d adoptanimal_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medivet-network
+
+  adoptanimal-service:
+    build:
+      context: ./adoptanimal-service
+      dockerfile: Dockerfile
+    container_name: adoptanimal-service
+    restart: unless-stopped
+    ports:
+      - "8085:8085"
+    environment:
+      SERVER_PORT: 8085
+      SPRING_DATASOURCE_URL: jdbc:postgresql://adoptanimal-db:5432/adoptanimal_db
+      SPRING_DATASOURCE_USERNAME: adoptanimal_user
+      SPRING_DATASOURCE_PASSWORD: adoptanimal_password
+      PETPASS_URL: http://petpass-service:8082
+      AUTH_SERVICE_URL: http://auth-service:8081
+      VETINTEROP_URL: http://vetinterop-service:8087/ws
+      VETINTEROP_STUB: "true"
+      NOTIFICATION_URL: http://notification-service:8086
+      NOTIFICATION_ENABLED: "false"
+    depends_on:
+      adoptanimal-db:
+        condition: service_healthy
+      petpass-service:
+        condition: service_started
+    networks:
+      - medivet-network
+
 networks:
   medivet-network:
     driver: bridge
@@ -143,3 +243,6 @@ volumes:
   auth_db_data:
   petpass_db_data:
   vetbooking_db_data:
+  helpanimal_db_data:
+  helpanimal_photos:
+  adoptanimal_db_data:

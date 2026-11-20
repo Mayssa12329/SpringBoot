@@ -16,6 +16,8 @@
         <module>auth-service</module>
         <module>petpass-service</module>
         <module>vetbooking-service</module>
+        <module>helpanimal-service</module>
+        <module>adoptanimal-service</module>
     </modules>
 
     <properties>
