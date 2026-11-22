@@ -1,0 +1,115 @@
+<div class="page-wrapper">
+
+  <!-- ── Toasts ── -->
+  <div class="toast toast-success" *ngIf="successMsg">✅ {{ successMsg }}</div>
+  <div class="toast toast-error" *ngIf="errorMsg">
+    ⚠️ {{ errorMsg }}
+    <button class="toast-close" (click)="dismissError()">✕</button>
+  </div>
+
+  <!-- ── Page header ── -->
+  <div class="page-header">
+    <div>
+      <h1>⏳ Waiting List</h1>
+      <p class="subtitle">Your slot requests — accept an offer within 30 minutes when available.</p>
+    </div>
+    <button class="btn-primary" routerLink="/vet-booking">+ New Booking</button>
+  </div>
+
+  <!-- ── Loading ── -->
+  <div class="loading" *ngIf="loading">
+    <span class="spinner"></span> Loading waiting list…
+  </div>
+
+  <!-- ── Empty ── -->
+  <div class="empty" *ngIf="!loading && entries.length === 0">
+    <p>You are not on any waiting list.<br>
+      <a routerLink="/vet-booking">Search for a vet →</a>
+    </p>
+  </div>
+
+  <!-- ── Entry cards ── -->
+  <div class="card-list" *ngIf="!loading && entries.length > 0">
+    <div
+      class="entry-card"
+      *ngFor="let entry of entries"
+      [class.card-offered]="entry.status === 'OFFERED'"
+    >
+
+      <!-- ── OFFERED urgent banner ── -->
+      <div class="offer-banner" *ngIf="entry.status === 'OFFERED'">
+        <span class="offer-icon">🔔</span>
+        <div class="offer-text">
+          <strong>A slot is available for you!</strong>
+          <span *ngIf="minutesRemaining(entry) !== null && minutesRemaining(entry)! > 0">
+            You have <strong>{{ minutesRemaining(entry) }} min</strong> to accept.
+          </span>
+          <span *ngIf="isOfferExpired(entry)" class="expired-text">
+            This offer has expired.
+          </span>
+        </div>
+      </div>
+
+      <!-- ── Card header ── -->
+      <div class="card-header">
+        <div class="vet-info">
+          <div class="vet-avatar">
+            {{ entry.vetFullName.split(' ')[1]?.charAt(0) ?? '?' }}
+          </div>
+          <div>
+            <div class="vet-name">{{ entry.vetFullName }}</div>
+            <div class="vet-specialty">{{ entry.consultationType | titlecase }}</div>
+          </div>
+        </div>
+        <span class="status-badge" [ngClass]="statusClass(entry.status)">
+          {{ statusLabel(entry.status) }}
+        </span>
+      </div>
+
+      <!-- ── Card body ── -->
+      <div class="card-body">
+        <div class="detail-row">
+          <span class="detail-icon">📅</span>
+          <span>{{ formatDateTime(entry.slotStartTime) }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="detail-icon">🕒</span>
+          <span>Registered {{ formatDateTime(entry.registeredAt) }}</span>
+        </div>
+        <div class="detail-row" *ngIf="entry.petId">
+          <span class="detail-icon">🐾</span>
+          <span>Pet ID: {{ entry.petId }}</span>
+        </div>
+        <!-- Offer expiry countdown -->
+        <div class="offer-expires" *ngIf="entry.status === 'OFFERED' && entry.offerExpiresAt">
+          <span class="detail-icon">⏱️</span>
+          <span>Offer expires: <strong>{{ formatDateTime(entry.offerExpiresAt) }}</strong></span>
+        </div>
+      </div>
+
+      <!-- ── Card actions ── -->
+      <div class="card-actions" *ngIf="isActionable(entry)">
+
+        <!-- Accept — only when OFFERED and not expired -->
+        <button
+          *ngIf="entry.status === 'OFFERED' && !isOfferExpired(entry)"
+          class="btn-action btn-accept"
+          (click)="acceptOffer(entry)"
+        >
+          ✅ Accept Offer
+        </button>
+
+        <!-- Cancel — WAITING or OFFERED (not expired mandatory) -->
+        <button
+          class="btn-action btn-cancel-entry"
+          (click)="cancelEntry(entry)"
+        >
+          ✕ Cancel
+        </button>
+
+      </div>
+
+    </div>
+  </div>
+
+</div>

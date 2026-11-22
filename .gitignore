@@ -36,5 +36,7 @@ build/
 *.log
 
 
-### Angular Frontend (géré séparément) ###
-medivet-frontend/
+### Angular Frontend ###
+medivet-frontend/node_modules/
+medivet-frontend/dist/
+medivet-frontend/.angular/

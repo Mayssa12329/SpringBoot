@@ -1,0 +1,161 @@
+$green:      #00b894;
+$green-dark: #00a381;
+$green-bg:   #e8f8f3;
+$text:       #1a1a2e;
+$muted:      #6b7280;
+$border:     #e9ecef;
+$radius:     12px;
+
+.page-wrapper { padding: 24px 28px; background: #f8f9fa; min-height: 100vh; }
+
+// ── Toasts ────────────────────────────────────────────────────────────────────
+.toast {
+  position: fixed; top: 76px; right: 24px; z-index: 999;
+  padding: 12px 18px; border-radius: 10px; font-size: 14px; font-weight: 600;
+  display: flex; align-items: center; gap: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.12); animation: slideIn .25s ease;
+  max-width: 420px;
+  &-success { background: $green; color: #fff; }
+  &-error   { background: #fff;   color: #c53030; border: 1px solid #fed7d7; }
+  &-close   { background: none; border: none; cursor: pointer; font-size: 14px; color: inherit; }
+}
+@keyframes slideIn { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+// ── Overlay dialog ────────────────────────────────────────────────────────────
+.overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 900;
+  display: flex; align-items: center; justify-content: center;
+}
+.dialog {
+  background: #fff; border-radius: $radius; padding: 28px 32px; max-width: 380px; width: 90%;
+  box-shadow: 0 8px 32px rgba(0,0,0,.2);
+  h3 { font-size: 16px; font-weight: 700; color: $text; margin: 0 0 10px; }
+  p  { font-size: 14px; color: $muted; margin: 0 0 20px; line-height: 1.5; }
+}
+.dialog-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+// ── Page header ───────────────────────────────────────────────────────────────
+.page-header {
+  display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px;
+  h1 { font-size: 22px; font-weight: 800; color: $text; margin: 0 0 4px; }
+  .subtitle { font-size: 14px; color: $muted; margin: 0; }
+}
+
+// ── Filter bar ────────────────────────────────────────────────────────────────
+.filter-bar { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.filter-btn {
+  padding: 7px 14px; border-radius: 50px; border: 2px solid $border; background: #fff;
+  font-size: 13px; font-weight: 600; color: $muted; cursor: pointer; transition: all .2s;
+  display: flex; align-items: center; gap: 6px;
+  &:hover   { border-color: $green; color: $green; }
+  &.active  { border-color: $green; background: $green-bg; color: $green; }
+}
+.badge {
+  background: #e5e7eb; color: $muted; border-radius: 50px; padding: 1px 7px;
+  font-size: 11px; font-weight: 700;
+  &.confirmed { background: $green-bg;   color: $green; }
+  &.pending   { background: #eff6ff;     color: #2563eb; }
+  &.cancelled { background: #fef2f2;     color: #dc2626; }
+}
+
+// ── Loading / Empty ───────────────────────────────────────────────────────────
+.loading { display: flex; align-items: center; gap: 10px; padding: 40px; color: $muted; font-size: 14px; }
+.spinner {
+  width: 18px; height: 18px; border: 2px solid $border; border-top-color: $green;
+  border-radius: 50%; animation: spin .7s linear infinite; display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty { background: #fff; border-radius: $radius; padding: 48px; text-align: center; color: $muted; font-size: 14px; border: 1px dashed $border; a { color: $green; } }
+
+// ── Card list ─────────────────────────────────────────────────────────────────
+.card-list { display: flex; flex-direction: column; gap: 14px; }
+
+.appt-card {
+  background: #fff; border-radius: $radius; border: 1px solid $border;
+  box-shadow: 0 1px 6px rgba(0,0,0,.05); overflow: hidden;
+  transition: box-shadow .2s;
+  &:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+}
+
+// Card header
+.card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid $border;
+}
+.vet-info  { display: flex; align-items: center; gap: 12px; }
+.vet-avatar {
+  width: 42px; height: 42px; border-radius: 50%;
+  background: linear-gradient(135deg, $green, #00cec9);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; font-size: 15px; flex-shrink: 0;
+}
+.vet-name    { font-size: 15px; font-weight: 700; color: $text; }
+.vet-specialty { font-size: 12px; color: $muted; margin-top: 2px; }
+
+// Status badges
+.status-badge {
+  padding: 4px 12px; border-radius: 50px; font-size: 12px; font-weight: 700;
+  &.badge-confirmed  { background: $green-bg; color: $green; }
+  &.badge-pending    { background: #eff6ff;   color: #2563eb; }
+  &.badge-cancelled  { background: #fef2f2;   color: #dc2626; }
+  &.badge-late       { background: #fff7ed;   color: #ea580c; }
+  &.badge-completed  { background: #f3f4f6;   color: $muted; }
+}
+
+// Card body
+.card-body { padding: 14px 20px; display: flex; flex-direction: column; gap: 7px; }
+.detail-row {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 14px; color: $text;
+  .detail-icon { font-size: 15px; width: 20px; }
+  .detail-sep  { color: $muted; }
+}
+.notes-row { align-items: flex-start; }
+.notes-text { font-size: 13px; color: $muted; font-style: italic; }
+
+// Notes edit
+.notes-edit { padding: 0 20px 14px; }
+.notes-input {
+  width: 100%; padding: 10px 12px; border: 1px solid $border; border-radius: 8px;
+  font-size: 14px; color: $text; resize: vertical; outline: none; font-family: inherit;
+  &:focus { border-color: $green; box-shadow: 0 0 0 3px rgba(0,184,148,.1); }
+}
+
+// Reschedule panel
+.reschedule-panel { padding: 14px 20px; background: #fafafa; border-top: 1px solid $border; }
+.reschedule-panel h4 { font-size: 14px; font-weight: 700; color: $text; margin: 0 0 14px; }
+.reschedule-form { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+.form-field { display: flex; flex-direction: column; gap: 5px; label { font-size: 12px; font-weight: 600; color: $muted; text-transform: uppercase; letter-spacing: .4px; } }
+.form-input { padding: 9px 12px; border: 1px solid $border; border-radius: 8px; font-size: 14px; color: $text; outline: none; width: 200px; &:focus { border-color: $green; } }
+.slot-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.slot-chip {
+  padding: 6px 14px; border-radius: 8px; border: 1px solid $border;
+  background: #fff; font-size: 13px; font-weight: 600; color: $text; cursor: pointer; transition: all .2s;
+  &:hover   { border-color: $green; color: $green; }
+  &.selected { background: $green; color: #fff; border-color: $green; }
+}
+.no-slots    { font-size: 13px; color: $muted; font-style: italic; }
+.loading-slots { display: flex; align-items: center; gap: 8px; font-size: 13px; color: $muted; }
+.spinner-sm  { width: 14px; height: 14px; border: 2px solid $border; border-top-color: $green; border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; }
+.inline-error { font-size: 13px; color: #dc2626; margin: 0; }
+
+// Inline actions
+.inline-actions { display: flex; gap: 8px; margin-top: 8px; }
+
+// Card actions
+.card-actions { display: flex; gap: 8px; padding: 12px 20px; border-top: 1px solid $border; flex-wrap: wrap; }
+.btn-action {
+  padding: 7px 14px; border-radius: 8px; border: none; font-size: 13px;
+  font-weight: 600; cursor: pointer; transition: all .2s;
+  &.btn-reschedule { background: #eff6ff; color: #2563eb; &:hover { background: #dbeafe; } }
+  &.btn-edit-notes { background: #f0fdf4; color: #16a34a; &:hover { background: #dcfce7; } }
+  &.btn-cancel     { background: #fef2f2; color: #dc2626; &:hover { background: #fee2e2; } }
+}
+
+// Shared buttons
+.btn-primary    { background: $green; color: #fff; border: none; border-radius: 50px; padding: 11px 22px; font-size: 14px; font-weight: 700; cursor: pointer; transition: background .2s; &:hover { background: $green-dark; } }
+.btn-secondary  { background: #f3f4f6; color: $text; border: none; border-radius: 8px; padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer; &:hover { background: #e5e7eb; } }
+.btn-danger     { background: #dc2626; color: #fff; border: none; border-radius: 8px; padding: 10px 18px; font-size: 14px; font-weight: 600; cursor: pointer; &:hover { background: #b91c1c; } }
+.btn-sm         { padding: 7px 14px; border-radius: 8px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s; }
+.btn-primary-sm { background: $green; color: #fff; &:hover:not(:disabled) { background: $green-dark; } &:disabled { background: #d1d5db; cursor: not-allowed; } }
+.btn-ghost      { background: transparent; color: $muted; &:hover { background: $border; } }

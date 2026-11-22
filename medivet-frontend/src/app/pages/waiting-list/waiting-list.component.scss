@@ -1,0 +1,100 @@
+$green:      #00b894;
+$green-dark: #00a381;
+$green-bg:   #e8f8f3;
+$text:       #1a1a2e;
+$muted:      #6b7280;
+$border:     #e9ecef;
+$radius:     12px;
+$offered:    #fef3c7;
+$offered-border: #f59e0b;
+
+.page-wrapper { padding: 24px 28px; background: #f8f9fa; min-height: 100vh; }
+
+// ── Toasts ────────────────────────────────────────────────────────────────────
+.toast {
+  position: fixed; top: 76px; right: 24px; z-index: 999;
+  padding: 12px 18px; border-radius: 10px; font-size: 14px; font-weight: 600;
+  display: flex; align-items: center; gap: 10px; max-width: 440px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.12); animation: slideIn .25s ease;
+  &-success { background: $green; color: #fff; }
+  &-error   { background: #fff; color: #c53030; border: 1px solid #fed7d7; }
+  &-close   { background: none; border: none; cursor: pointer; font-size: 14px; color: inherit; }
+}
+@keyframes slideIn { from { transform: translateX(30px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+// ── Page header ───────────────────────────────────────────────────────────────
+.page-header {
+  display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px;
+  h1 { font-size: 22px; font-weight: 800; color: $text; margin: 0 0 4px; }
+  .subtitle { font-size: 14px; color: $muted; margin: 0; }
+}
+
+// ── Loading / Empty ───────────────────────────────────────────────────────────
+.loading { display: flex; align-items: center; gap: 10px; padding: 40px; color: $muted; font-size: 14px; }
+.spinner { width: 18px; height: 18px; border: 2px solid $border; border-top-color: $green; border-radius: 50%; animation: spin .7s linear infinite; display: inline-block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.empty { background: #fff; border-radius: $radius; padding: 48px; text-align: center; color: $muted; font-size: 14px; border: 1px dashed $border; line-height: 1.8; a { color: $green; } }
+
+// ── Card list ─────────────────────────────────────────────────────────────────
+.card-list { display: flex; flex-direction: column; gap: 14px; }
+
+.entry-card {
+  background: #fff; border-radius: $radius; border: 1px solid $border;
+  box-shadow: 0 1px 6px rgba(0,0,0,.05); overflow: hidden;
+  transition: box-shadow .2s;
+  &:hover { box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+  &.card-offered { border-color: $offered-border; box-shadow: 0 4px 16px rgba(245,158,11,.15); }
+}
+
+// ── Offer banner ──────────────────────────────────────────────────────────────
+.offer-banner {
+  display: flex; align-items: center; gap: 12px;
+  background: $offered; padding: 12px 20px; border-bottom: 1px solid $offered-border;
+  .offer-icon { font-size: 20px; }
+  .offer-text { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: #92400e; strong { font-weight: 700; } }
+  .expired-text { color: #dc2626; font-weight: 600; }
+}
+
+// ── Card header ───────────────────────────────────────────────────────────────
+.card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px; border-bottom: 1px solid $border;
+}
+.vet-info  { display: flex; align-items: center; gap: 12px; }
+.vet-avatar {
+  width: 42px; height: 42px; border-radius: 50%;
+  background: linear-gradient(135deg, $green, #00cec9);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 700; font-size: 15px; flex-shrink: 0;
+}
+.vet-name      { font-size: 15px; font-weight: 700; color: $text; }
+.vet-specialty { font-size: 12px; color: $muted; margin-top: 2px; }
+
+// ── Status badges ─────────────────────────────────────────────────────────────
+.status-badge {
+  padding: 4px 12px; border-radius: 50px; font-size: 12px; font-weight: 700;
+  &.badge-waiting   { background: #eff6ff; color: #2563eb; }
+  &.badge-offered   { background: $offered; color: #92400e; }
+  &.badge-accepted  { background: $green-bg; color: $green; }
+  &.badge-expired   { background: #f3f4f6; color: $muted; }
+  &.badge-cancelled { background: #fef2f2; color: #dc2626; }
+}
+
+// ── Card body ─────────────────────────────────────────────────────────────────
+.card-body { padding: 14px 20px; display: flex; flex-direction: column; gap: 7px; }
+.detail-row {
+  display: flex; align-items: center; gap: 7px; font-size: 14px; color: $text;
+  .detail-icon { font-size: 15px; width: 20px; }
+}
+.offer-expires { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #92400e; .detail-icon { font-size: 15px; width: 20px; } }
+
+// ── Card actions ──────────────────────────────────────────────────────────────
+.card-actions { display: flex; gap: 8px; padding: 12px 20px; border-top: 1px solid $border; }
+.btn-action {
+  padding: 8px 16px; border-radius: 8px; border: none; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s;
+  &.btn-accept       { background: $green;   color: #fff;    &:hover { background: $green-dark; } }
+  &.btn-cancel-entry { background: #fef2f2;  color: #dc2626; &:hover { background: #fee2e2; } }
+}
+
+// ── Shared ────────────────────────────────────────────────────────────────────
+.btn-primary { background: $green; color: #fff; border: none; border-radius: 50px; padding: 11px 22px; font-size: 14px; font-weight: 700; cursor: pointer; transition: background .2s; &:hover { background: $green-dark; } }
