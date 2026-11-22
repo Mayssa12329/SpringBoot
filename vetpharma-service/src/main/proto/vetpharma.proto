@@ -1,0 +1,166 @@
+syntax = "proto3";
+
+package vetpharma;
+
+option java_package         = "com.medivet.vetpharma.grpc.generated";
+option java_outer_classname = "VetPharmaProto";
+option java_multiple_files  = true;
+
+// ═══════════════════════════════════════════════════════════════════
+//  SERVICE
+// ═══════════════════════════════════════════════════════════════════
+service VetPharmaService {
+
+  // ── US33 : Gérer le catalogue de produits (CRUD complet) ──────────
+  rpc ListerProduits    (ListerProduitsRequest)    returns (ListerProduitsResponse);
+  rpc ObtenirProduit    (ObtenirProduitRequest)    returns (ProduitResponse);
+  rpc CreerProduit      (CreerProduitRequest)      returns (ProduitResponse);
+  rpc ModifierProduit   (ModifierProduitRequest)   returns (ProduitResponse);
+  rpc SupprimerProduit  (SupprimerProduitRequest)  returns (SupprimerProduitResponse);
+
+  // ── US34 : Mettre à jour les stocks déclarés ──────────────────────
+  rpc MettreAJourStock  (MettreAJourStockRequest)  returns (StockResponse);
+
+  // ── US35 : Rechercher un produit vétérinaire (par nom ou catégorie)
+  rpc RechercherProduits(RechercherProduitsRequest) returns (ListerProduitsResponse);
+
+  // ── US36 : Interroger plusieurs pharmacies via gRPC ───────────────
+  rpc ListerPharmacies  (ListerPharmaciesRequest)  returns (ListerPharmaciesResponse);
+  rpc VerifierStock     (VerifierStockRequest)     returns (StockResponse);
+
+  // Streaming serveur : flux des niveaux de stock en temps réel
+  rpc SuivreStocks      (SuivreStocksRequest)      returns (stream StockResponse);
+
+  // ── US37 : Réservation temporaire (TTL 15 min, idempotence RM11) ──
+  rpc CreerReservation  (CreerReservationRequest)  returns (ReservationResponse);
+  rpc AnnulerReservation(AnnulerReservationRequest) returns (ReservationResponse);
+
+  // ── US38 : Confirmer la disponibilité / valider une réservation ───
+  rpc ConfirmerReservation(ConfirmerReservationRequest) returns (ReservationResponse);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  MESSAGES  –  Produit  (US33 + US35)
+// ═══════════════════════════════════════════════════════════════════
+message ListerProduitsRequest {
+  string categorie = 1;   // filtre optionnel (vide = tous)
+}
+
+message RechercherProduitsRequest {
+  string mot_cle   = 1;   // US35 : recherche par nom (contains, insensible à la casse)
+  string categorie = 2;   // filtre optionnel combinable
+}
+
+message ListerProduitsResponse {
+  repeated ProduitResponse produits = 1;
+}
+
+message ObtenirProduitRequest {
+  int64 produit_id = 1;
+}
+
+message CreerProduitRequest {
+  string nom         = 1;
+  string description = 2;
+  string categorie   = 3;
+  string unite       = 4;
+}
+
+message ModifierProduitRequest {
+  int64  produit_id  = 1;
+  string nom         = 2;
+  string description = 3;
+  string categorie   = 4;
+  string unite       = 5;
+}
+
+message SupprimerProduitRequest {
+  int64 produit_id = 1;
+}
+
+message SupprimerProduitResponse {
+  bool   succes    = 1;
+  string message   = 2;
+}
+
+message ProduitResponse {
+  int64  produit_id  = 1;
+  string nom         = 2;
+  string description = 3;
+  string categorie   = 4;
+  string unite       = 5;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  MESSAGES  –  Pharmacie  (US36)
+// ═══════════════════════════════════════════════════════════════════
+message ListerPharmaciesRequest {
+  string ville = 1;   // filtre optionnel (vide = toutes)
+}
+
+message ListerPharmaciesResponse {
+  repeated PharmacieResponse pharmacies = 1;
+}
+
+message PharmacieResponse {
+  int64  pharmacie_id = 1;
+  string nom          = 2;
+  string adresse      = 3;
+  string ville        = 4;
+  string telephone    = 5;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  MESSAGES  –  Stock  (US34 + US36)
+// ═══════════════════════════════════════════════════════════════════
+message VerifierStockRequest {
+  int64 produit_id   = 1;
+  int64 pharmacie_id = 2;
+}
+
+message MettreAJourStockRequest {
+  int64 produit_id      = 1;
+  int64 pharmacie_id    = 2;
+  int32 nouvelle_quantite = 3;   // US34 : valeur absolue déclarée par la pharmacie
+}
+
+message SuivreStocksRequest {
+  int64 pharmacie_id = 1;   // 0 = toutes les pharmacies
+}
+
+message StockResponse {
+  int64  stock_id       = 1;
+  int64  produit_id     = 2;
+  int64  pharmacie_id   = 3;
+  int32  quantite_dispo = 4;
+  string statut         = 5;   // DISPONIBLE | FAIBLE | RUPTURE
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  MESSAGES  –  Réservation  (US37 + US38)
+// ═══════════════════════════════════════════════════════════════════
+message CreerReservationRequest {
+  string idempotency_key = 1;   // RM11 : UUID unique côté client
+  int64  produit_id      = 2;
+  int64  pharmacie_id    = 3;
+  int32  quantite        = 4;
+  string patient_id      = 5;   // X-User-Id injecté par le gateway
+}
+
+message AnnulerReservationRequest {
+  int64 reservation_id = 1;
+}
+
+message ConfirmerReservationRequest {
+  int64 reservation_id = 1;   // US38 : la pharmacie confirme la disponibilité
+}
+
+message ReservationResponse {
+  int64  reservation_id  = 1;
+  string idempotency_key = 2;
+  int64  produit_id      = 3;
+  int64  pharmacie_id    = 4;
+  int32  quantite        = 5;
+  string statut          = 6;   // EN_ATTENTE | CONFIRMEE | ANNULEE | EXPIREE
+  string expiration_at   = 7;   // ISO-8601, TTL = +15 min
+}
