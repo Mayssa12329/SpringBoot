@@ -1,0 +1,13 @@
+@if (isAuthPage) {
+  <router-outlet></router-outlet>
+} @else {
+  <div class="app-layout">
+    <app-sidebar [activeTab]="currentTab" (tabChanged)="onTabChanged($event)"></app-sidebar>
+    <div class="app-main-column">
+      <main class="main-content">
+        <app-header></app-header>
+        <router-outlet></router-outlet>
+      </main>
+    </div>
+  </div>
+}

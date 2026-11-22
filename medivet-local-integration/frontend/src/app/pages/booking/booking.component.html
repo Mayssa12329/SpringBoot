@@ -1,0 +1,173 @@
+<div class="booking-page">
+  <!-- Hero Banner -->
+  <section class="booking-hero">
+    <div class="hero-content">
+      <span class="badge-vetbooking">🩺 VetBooking</span>
+      <h1 class="hero-title">Prenez rendez-vous avec votre vétérinaire</h1>
+      <p class="hero-sub">Des soins d'excellence pour vos compagnons, rapidement et simplement.</p>
+    </div>
+    <div class="hero-decor" aria-hidden="true">
+      <span class="paw-icon">🐾</span>
+    </div>
+  </section>
+
+  <!-- Main Booking Grid -->
+  <div class="booking-grid">
+    <!-- Left Column: Veterinarians List -->
+    <div class="vets-panel card">
+      <div class="panel-header">
+        <div class="header-title">
+          <span class="icon">🩺</span>
+          <h2>Nos Vétérinaires</h2>
+        </div>
+        <span class="vet-count">{{ filteredVets().length }} disponibles</span>
+      </div>
+
+      <!-- Filters & Search -->
+      <div class="search-filter-box">
+        <div class="search-input-wrap">
+          <input
+            type="text"
+            placeholder="Rechercher par nom, ville ou spécialité..."
+            [ngModel]="searchQuery()"
+            (ngModelChange)="searchQuery.set($event)"
+            class="search-input"
+          />
+        </div>
+        <div class="filter-pills">
+          @for (f of filters; track f.id) {
+            <button
+              type="button"
+              class="pill-btn"
+              [class.active]="activeFilter() === f.id"
+              (click)="setFilter(f.id)"
+            >
+              <span>{{ f.icon }}</span>
+              <span>{{ f.label }}</span>
+            </button>
+          }
+        </div>
+      </div>
+
+      <!-- Vets Cards -->
+      <div class="vets-list">
+        @for (vet of filteredVets(); track vet.id) {
+          <div
+            class="vet-card"
+            [class.selected]="selectedVet()?.id === vet.id"
+            (click)="selectVet(vet)"
+          >
+            <img [src]="vet.photo" [alt]="vet.name" class="vet-avatar" />
+            <div class="vet-info">
+              <div class="vet-name-row">
+                <span class="vet-name">{{ vet.name }}</span>
+                @if (vet.verified) {
+                  <span class="verified-badge" title="Praticien vérifié">✓</span>
+                }
+              </div>
+              <span class="vet-specialty">{{ vet.specialty }}</span>
+              <div class="vet-meta">
+                <span>📍 {{ vet.location }}</span>
+                <span>⭐ {{ vet.rating }} ({{ vet.reviews }})</span>
+                <span>💼 {{ vet.experience }}</span>
+              </div>
+            </div>
+            <div class="vet-avail-tag" [attr.data-avail]="vet.availability">
+              {{ vet.availabilityLabel }}
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Right Column: Date, Slot & Confirmation -->
+    <div class="schedule-panel card">
+      <div class="panel-header">
+        <div class="header-title">
+          <span class="icon">📅</span>
+          <h2>Date & Créneau</h2>
+        </div>
+        <span class="selected-month">{{ currentMonth }}</span>
+      </div>
+
+      <!-- Selected Vet Mini Card -->
+      @if (selectedVet(); as vet) {
+        <div class="selected-vet-preview">
+          <img [src]="vet.photo" [alt]="vet.name" class="preview-avatar" />
+          <div>
+            <strong>{{ vet.name }}</strong>
+            <p>{{ vet.specialty }} &bull; {{ vet.location }}</p>
+          </div>
+        </div>
+      }
+
+      <!-- Mini Calendar -->
+      <div class="calendar-wrap">
+        <div class="calendar-weekdays">
+          @for (day of weekDays; track day) {
+            <span class="weekday">{{ day }}</span>
+          }
+        </div>
+        <div class="calendar-days">
+          @for (day of calendarDays; track $index) {
+            @if (day !== null) {
+              <button
+                type="button"
+                class="day-btn"
+                [class.selected]="selectedDay() === day"
+                (click)="selectDay(day)"
+              >
+                {{ day }}
+              </button>
+            } @else {
+              <span class="day-empty"></span>
+            }
+          }
+        </div>
+      </div>
+
+      <!-- Slots Picker -->
+      <div class="slots-section">
+        <h3>Créneaux Disponibles</h3>
+        <div class="slots-grid">
+          @for (slot of timeSlots; track slot.time) {
+            <button
+              type="button"
+              class="slot-btn"
+              [class.selected]="selectedSlot() === slot.time"
+              [class.disabled]="!slot.available"
+              [disabled]="!slot.available"
+              (click)="selectSlot(slot)"
+            >
+              {{ slot.time }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <!-- Motifs & Confirmation -->
+      <div class="booking-summary">
+        <div class="summary-line">
+          <span>Date :</span>
+          <strong>{{ selectedDay() }} {{ currentMonth }}</strong>
+        </div>
+        <div class="summary-line">
+          <span>Heure :</span>
+          <strong>{{ selectedSlot() || 'Non sélectionné' }}</strong>
+        </div>
+        <div class="summary-line">
+          <span>Praticien :</span>
+          <strong>{{ selectedVet()?.name || 'Aucun' }}</strong>
+        </div>
+
+        <button
+          type="button"
+          class="btn-confirm-appointment"
+          (click)="bookAppointment()"
+        >
+          Confirmer le Rendez-vous 🐾
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
