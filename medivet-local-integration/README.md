@@ -42,6 +42,11 @@ medivet-local-integration/
     ├── Dockerfile                           # Port 8085 | DB: 5435 (adoptanimal_db)
     ├── contract/openapi.yml
     └── src/main/java/com/medivet/adoptanimal/
+│
+└── vetinterop-service/                      # Microservice 6 : VetInterop - Registre des puces (SOAP)
+    ├── Dockerfile                           # Port 8087 | DB: 5436 (vetinterop_db)
+    ├── contract/vetinterop.xsd              # Contrat SOAP (XSD)
+    └── src/main/java/com/medivet/vetinterop/
 ```
 
 ---
@@ -55,6 +60,7 @@ medivet-local-integration/
 | **`vetbooking-service`** | `8083` | `5433` | `vetbooking_db` | Gestion des créneaux, prise de RDV, annulation, liste d'attente (FIFO) |
 | **`helpanimal-service`** | `8084` | `5434` | `helpanimal_db` | Signalement d'animaux blessés avec photo et géolocalisation, suivi |
 | **`adoptanimal-service`** | `8085` | `5435` | `adoptanimal_db` | Publication d'annonces d'adoption, candidatures, vérification d'éligibilité |
+| **`vetinterop-service`** | `8087` | `5436` | `vetinterop_db` | Service SOAP : vérification d'identité des puces (RM10) |
 
 ---
 
@@ -151,6 +157,7 @@ Après démarrage des conteneurs, les documentations interactives Swagger UI son
 * 🐶 **PetPass Service** : [http://localhost:8082/swagger-ui/index.html](http://localhost:8082/swagger-ui/index.html)
 * 📅 **VetBooking Service** : [http://localhost:8083/swagger-ui/index.html](http://localhost:8083/swagger-ui/index.html)
 * 🚑 **HelpAnimal Service** : [http://localhost:8084/swagger-ui/index.html](http://localhost:8084/swagger-ui/index.html)
+* 🔎 **VetInterop (SOAP)** : WSDL [http://localhost:8087/ws/vetinterop.wsdl](http://localhost:8087/ws/vetinterop.wsdl)
 * 🏡 **AdoptAnimal Service** : [http://localhost:8085/swagger-ui/index.html](http://localhost:8085/swagger-ui/index.html)
 
 Pour chaque service, le bouton **Authorize** permet d'injecter le jeton `Bearer <token>` pour tester les routes sécurisées.

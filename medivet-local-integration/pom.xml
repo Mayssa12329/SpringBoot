@@ -18,6 +18,7 @@
         <module>vetbooking-service</module>
         <module>helpanimal-service</module>
         <module>adoptanimal-service</module>
+        <module>vetinterop-service</module>
     </modules>
 
     <properties>

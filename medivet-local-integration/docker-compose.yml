@@ -199,7 +199,6 @@ services:
       - "5435:5432"
     volumes:
       - adoptanimal_db_data:/var/lib/postgresql/data
-      - ./adoptanimal-service/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U adoptanimal_user -d adoptanimal_db"]
       interval: 5s
@@ -224,7 +223,7 @@ services:
       PETPASS_URL: http://petpass-service:8082
       AUTH_SERVICE_URL: http://auth-service:8081
       VETINTEROP_URL: http://vetinterop-service:8087/ws
-      VETINTEROP_STUB: "true"
+      VETINTEROP_STUB: "false"
       NOTIFICATION_URL: http://notification-service:8086
       NOTIFICATION_ENABLED: "false"
     depends_on:
@@ -232,6 +231,50 @@ services:
         condition: service_healthy
       petpass-service:
         condition: service_started
+      vetinterop-service:
+        condition: service_started
+    networks:
+      - medivet-network
+
+  # ---------------------------------------------------------------
+  # Microservice 6 : VetInterop (SOAP) - registre des puces
+  # ---------------------------------------------------------------
+  vetinterop-db:
+    image: postgres:16-alpine
+    container_name: medivet-vetinterop-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vetinterop_db
+      POSTGRES_USER: vetinterop_user
+      POSTGRES_PASSWORD: vetinterop_password
+    ports:
+      - "5436:5432"
+    volumes:
+      - vetinterop_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vetinterop_user -d vetinterop_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medivet-network
+
+  vetinterop-service:
+    build:
+      context: ./vetinterop-service
+      dockerfile: Dockerfile
+    container_name: vetinterop-service
+    restart: unless-stopped
+    ports:
+      - "8087:8087"
+    environment:
+      SERVER_PORT: 8087
+      SPRING_DATASOURCE_URL: jdbc:postgresql://vetinterop-db:5432/vetinterop_db
+      SPRING_DATASOURCE_USERNAME: vetinterop_user
+      SPRING_DATASOURCE_PASSWORD: vetinterop_password
+    depends_on:
+      vetinterop-db:
+        condition: service_healthy
     networks:
       - medivet-network
 
@@ -246,3 +289,4 @@ volumes:
   helpanimal_db_data:
   helpanimal_photos:
   adoptanimal_db_data:
+  vetinterop_db_data:
