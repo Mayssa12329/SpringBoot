@@ -1,129 +1,189 @@
-# 🐾 MediVet Connect
+# MediVet Connect 🐾
 
-Plateforme distribuée et cloud-native pour la santé animale, la prise de rendez-vous vétérinaires, les urgences de sauvetage, l'adoption et la gestion pharmaceutique.
+> **Soigner, secourir, adopter : un seul réseau unifié pour les animaux**
 
-Projet réalisé par une équipe de **6 ingénieurs** selon la méthodologie **Agile/Scrum** (Spring Boot 3.4.x, Java 21 LTS, PostgreSQL 16, Docker).
+MediVet Connect est une plateforme distribuée basée sur une **architecture microservices** moderne. Elle facilite la collaboration entre propriétaires d'animaux, vétérinaires, bénévoles, refuges et services de secours.
 
 ---
 
-## 🏛️ 1. Architecture Globale du Système
+## 🏗️ Architecture Globale du Projet
 
-Le système repose sur une architecture **microservices polyglotte en protocoles** (REST, gRPC, SOAP) où chaque service est strictement propriétaire de ses données et de ses règles métier.
+Le projet suit le pattern **Database-per-Service**, garantissant l'indépendance, la résilience et la scalabilité de chaque domaine métier. Aucun microservice n'accède directement à la base de données d'un autre ; toutes les communications inter-services s'effectuent via **REST**, **SOAP**, et propagation de jetons de sécurité **JWT**.
 
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                        Client Web / Mobile                          │
-└───────────────────────────────┬─────────────────────────────────────┘
-                                │  HTTP / REST
-                                ▼
-┌─────────────────────────────────────────────────────────────────────┐
-│              API GATEWAY (Spring Cloud Gateway)                     │
-│         Routage /api/v1  •  Sécurité JWT (injecte X-User-Id)        │
-└───┬─────────┬─────────┬─────────┬─────────┬─────────┬───────────────┘
-    │  REST   │  REST   │  REST   │  REST   │  REST   │  REST
-    ▼         ▼         ▼         ▼         ▼         ▼
-┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌─────────────────┐
-│  User  │ │PetPass │ │Vet-    │ │ Help-  │ │  AdoptAnimal    │ ◀══ VOTRE SERVICE
-│Service │ │Service │ │Booking │ │ Animal │ │    Service      │
-│Auth/JWT│ │Dossier │ │ RDV    │ │Signale-│ │  Annonces &     │
-└───┬────┘ │médical │ │vétérin.│ │  ments │ │  candidatures   │
-    ▼      └───┬────┘ └───┬────┘ └───┬────┘ └────────┬────────┘
- ╔═══════╗ ╔═══════╗ ╔═══════╗ ╔═══════╗       ╔═══════════╗
- ║users- ║ ║petpass║ ║vbook- ║ ║help-  ║       ║ adopt-db  ║
- ║  db   ║ ║  -db  ║ ║ ing-db║ ║animal-║       ║ PostgreSQL║
- ╚═══════╝ ╚═══════╝ ╚═══════╝ ║  db   ║       ║  + Flyway ║
-                               ╚═══════╝       ╚═══════════╝
-
-   Chaque service possède SA PROPRE base (users-db, petpass-db,
-   vbooking-db, helpanimal-db, adopt-db, vetinterop-db,
-   notification-db, rescue-db, vetpharma-db)
-
-┌───────────────────── Services intermédiaires ─────────────────────┐
-│                                                                   │
-│   ┌───────────────┐        ┌────────────────────┐                 │
-│   │  VetInterop   │        │ Rescue-Coordination│                 │
-│   │ Registre ext. │        │ Affectation secours│                 │
-│   │               │        │                    │                 │
-│   │ SERVEUR SOAP  │        │  SERVEUR gRPC      │                 │
-│   │ (contract-    │        │  • RPC unaire      │                 │
-│   │  first: XSD + │        │  • RPC streaming   │                 │
-│   │  WSDL)        │        │                    │                 │
-│   └───────┬───────┘        └─────────┬──────────┘                 │
-│           │  ② SOAP                  │                           │
-│           │  ③ SOAP                  │                           │
-│   ┌───────┴──────────────────────────┴───────────┐               │
-│   │         NotificationService                  │              │
-│   │  (événements : adoption, rdv, signalement)    │              │
-│   └───────────────────┬───────────────────────────┘               │
-│                       ▲  gRPC                                     │
-│               ┌───────┴──────────────┐                            │
-│               │  VetPharmaService    │                            │
-│               │  Stocks médicaments  │                            │
-│               │  SERVEUR gRPC (unary)│                            │
-│               └──────────────────────┘                             │
-└────────────────────────────────────────────────────────────────────┘
+```text
+medivet-local-integration/
+├── pom.xml                                  # Parent Aggregator POM multi-modules
+├── docker-compose.yml                       # Orchestration complète (5 microservices + 5 bases PostgreSQL)
+├── README.md                                # Documentation générale
+├── docs/                                    # Documentation d'architecture & rapports
+├── postman/                                 # Collections de tests Postman automatisés
+│
+├── auth-service/                            # Microservice 1 : Authentification & Utilisateurs
+│   ├── Dockerfile                           # Port 8081 | DB: 5431 (auth_db)
+│   ├── contract/openapi.yml
+│   └── src/main/java/com/medivet/authentification/
+│
+├── petpass-service/                         # Microservice 2 : PetPass - Santé Animale & Carnet Médical
+│   ├── Dockerfile                           # Port 8082 | DB: 5432 (petpass_db)
+│   ├── contract/openapi.yml
+│   └── src/main/java/com/medivet/petpass/
+│
+├── vetbooking-service/                      # Microservice 3 : VetBooking - Prise de Rendez-vous
+│   ├── Dockerfile                           # Port 8083 | DB: 5433 (vetbooking_db)
+│   ├── contract/openapi.yml
+│   └── src/main/java/com/medivet/vetbooking/
+│
+├── helpanimal-service/                      # Microservice 4 : HelpAnimal - Signalement & Secours
+│   ├── Dockerfile                           # Port 8084 | DB: 5434 (helpanimal_db)
+│   ├── contract/openapi.yml
+│   └── src/main/java/com/medivet/helpanimal/
+│
+└── adoptanimal-service/                     # Microservice 5 : AdoptAnimal - Adoptions & Candidatures
+    ├── Dockerfile                           # Port 8085 | DB: 5435 (adoptanimal_db)
+    ├── contract/openapi.yml
+    └── src/main/java/com/medivet/adoptanimal/
+│
+└── vetinterop-service/                      # Microservice 6 : VetInterop - Registre des puces (SOAP)
+    ├── Dockerfile                           # Port 8087 | DB: 5436 (vetinterop_db)
+    ├── contract/vetinterop.xsd              # Contrat SOAP (XSD)
+    └── src/main/java/com/medivet/vetinterop/
 ```
 
 ---
 
-## 📦 2. Services Métier & Composants Transverses
+## 📊 Matrice des Microservices & Ports
 
-### A. Les 8 Services Métier
-
-| Service | Protocole exposé | Données propres (Ressources) | Décisions & Règles clés | Appels sortants |
-| :--- | :--- | :--- | :--- | :--- |
-| **UserService** | REST | Compte, rôle, session JWT | Authentification, RBAC, hachage mdp (RM16) | — |
-| **PetPassService** | REST + client SOAP | Animal, carnet médical, vaccins, accès | Chronologie des actes, éligibilité médicale (RM09) | → VetInterop (SOAP)<br>→ NotificationService |
-| **VetBookingService**| REST | Disponibilités, créneaux, RDV, file d'attente | Créneau unique (RM06), compatibilité acte (RM07), FIFO (RM08) | → NotificationService |
-| **HelpAnimalService**| REST | Signalements, photos, GPS, statuts | Priorité (RM01), doublons 100m/2h (RM02), cycle de vie (RM03) | → RescueCoordination (gRPC)<br>→ PetPass (REST) |
-| **RescueCoordinationService** | gRPC (unaire + stream) | Missions de sauvetage, affectation intervenant | Verrou optimiste (RM04), réattribution 15 min (RM05) | → NotificationService |
-| **VetPharmaService**| gRPC (unaire + stream) | Produits, pharmacies, stocks, réservations | Stock dispo, réservation 15 min, idempotence (RM11) | — |
-| **VetInteropService**| SOAP (XSD/WSDL) | Registre national simulé (puce 15 chiffres) | Verdict (VERIFIED, NOT_FOUND), SOAP Fault (RM10) | — |
-| **AdoptAnimalService**| REST | Annonces d'adoption, candidatures, visites | Éligibilité médicale, adoption finale unique (RM12) | → PetPass (REST)<br>→ VetInterop (SOAP)<br>→ NotificationService |
-
-### B. Composants Transverses
-
-| Composant | Protocole | Rôle |
-| :--- | :--- | :--- |
-| **API Gateway** | REST (entrée unique) | Routage `/api/v1`, validation centralisée des JWT, rate limiting (RM16) |
-| **NotificationService**| Événements / REST | Envoi dédupliqué par clé unique, rappels J-7, retries (RM14) |
-| **AdminService** | REST | Tableaux de bord, modération, journal d'audit centralisé (RM15) |
+| Microservice | Port HTTP | Port PostgreSQL | Base de Données | Rôle Principal |
+| :--- | :---: | :---: | :--- | :--- |
+| **`auth-service`** | `8081` | `5431` | `auth_db` | Inscription, connexion, émission JWT, gestion des profils & rôles |
+| **`petpass-service`** | `8082` | `5432` | `petpass_db` | Carnet de santé numérique, actes médicaux, vaccins, autorisations d'accès |
+| **`vetbooking-service`** | `8083` | `5433` | `vetbooking_db` | Gestion des créneaux, prise de RDV, annulation, liste d'attente (FIFO) |
+| **`helpanimal-service`** | `8084` | `5434` | `helpanimal_db` | Signalement d'animaux blessés avec photo et géolocalisation, suivi |
+| **`adoptanimal-service`** | `8085` | `5435` | `adoptanimal_db` | Publication d'annonces d'adoption, candidatures, vérification d'éligibilité |
+| **`vetinterop-service`** | `8087` | `5436` | `vetinterop_db` | Service SOAP : vérification d'identité des puces (RM10) |
 
 ---
 
-## 🔌 3. Interopérabilité et Protocoles
+## 🔗 Interconnexions Inter-services & Règles Métier
 
-Le projet répond strictement aux critères d'architecture avancée :
+```
+                    ┌───────────────────────────┐
+                    │       auth-service        │
+                    │         (Port 8081)       │
+                    └───────────┬───┬───────────┘
+     JWT / Moi Animaux (REST)   │   │  JWT / Moi RDV (REST)
+             ┌──────────────────┘   └──────────────────┐
+             ▼                                         ▼
+┌───────────────────────────┐         ┌───────────────────────────┐
+│      petpass-service      │◄────────┤    vetbooking-service     │
+│        (Port 8082)        │ Valide  │        (Port 8083)        │
+└──────▲─────────────▲──────┘ petId   └───────────────────────────┘
+       │             │
+       │             │ Éligibilité médicale
+       │             │ (Vaccination + Santé)
+       │             │
+┌──────┴────────────┐└─────────────────────────────────┐
+│ helpanimal-service│         ┌────────────────────────┴──┐
+│    (Port 8084)    │         │    adoptanimal-service    │
+│ Sauvetage terminé │         │        (Port 8085)        │
+│ crée animal/actes │         └────────────────┬──────────┘
+└───────────────────┘                          │
+                                               │ Vérifie puce (SOAP)
+                                               ▼
+                                      ┌───────────────────┐
+                                      │ vetinterop-service│
+                                      │ (SOAP / Simulée)  │
+                                      └───────────────────┘
+```
 
-1. **REST (OpenAPI v3 / Swagger)** :
-   * Préfixe d'API unique : `/api/v1/`
-   * Gestion centralisée des erreurs via `@RestControllerAdvice` (HTTP 401, 403, 404, 409, 422).
-2. **gRPC (Protocol Buffers)** :
-   * **RPC unaire** : Recherche de produits pharmaceutiques, affectation d'une mission de sauvetage.
-   * **RPC streaming (Server Streaming)** : Flux en direct des disponibilités des pharmacies, diffusion continue des nouvelles missions d'urgence aux intervenants connectés.
-   * Gestion des statuts gRPC (`NOT_FOUND`, `INVALID_ARGUMENT`, `FAILED_PRECONDITION`, `DEADLINE_EXCEEDED`).
-3. **SOAP (Contract-First)** :
-   * Schéma XSD rédigé avant le code, exposant les opérations : `VerifyAnimalIdentity`, `GetAnimalIdentification`, `CheckMicrochipStatus`.
-   * Distinction stricte entre résultat métier (`NOT_FOUND`) et erreur protocolaire (`SOAP Fault`).
-4. **Appels Inter-Services Hétérogènes** :
-   * `PetPassService` (REST) ➔ `VetInteropService` (SOAP) avec client `WebServiceTemplate` résilient.
-   * `HelpAnimalService` (REST) ➔ `RescueCoordinationService` (gRPC) avec timeout et circuit breaker (Resilience4j).
+1. **`auth-service` ➔ `petpass-service` & `vetbooking-service` (REST + JWT)** :
+   * L'endpoint centralisé `/api/utilisateurs/moi/animaux` agrège en temps réel les animaux du propriétaire connecté depuis PetPass.
+   * L'endpoint `/api/utilisateurs/moi/rendez-vous` agrège ses rendez-vous depuis VetBooking.
+2. **`vetbooking-service` ➔ `petpass-service` (REST + JWT)** :
+   * Lors de la prise de RDV (`POST /api/v1/appointments`), VetBooking vérifie obligatoirement que le `petId` existe dans PetPass (`404` si introuvable).
+   * À la réservation, il crée automatiquement une autorisation vétérinaire d'accès (`/vet-authorizations`).
+   * À la complétion du RDV, il enregistre l'acte dans le carnet médical PetPass (`/medical-records`).
+3. **`helpanimal-service` ➔ `petpass-service` (REST)** :
+   * Dès qu'un sauvetage passe au statut `TERMINE`, HelpAnimal crée automatiquement l'animal secouru et ouvre un dossier médical dans PetPass (**Scénario SC3**).
+4. **`adoptanimal-service` ➔ `petpass-service` (REST + JWT)** :
+   * Avant de publier une annonce d'adoption, vérifie que l'animal a ses vaccins à jour et un état de santé favorable (**Règle RM12**).
+5. **`adoptanimal-service` ➔ `vetinterop-service` (SOAP / WSDL / XML)** :
+   * Vérification de la puce d'identification via l'opération SOAP `VerifyAnimalIdentity` avec gestion des pannes et circuit breaker Resilience4j (**Règles RM10 & RM13**).
 
 ---
 
-## 🗄️ 4. Architecture de Données (PostgreSQL 16)
+## 🚀 Guide de Démarrage Rapide
 
-Conformément au pattern **Database-per-Service**, chaque domaine est cloisonné dans un schéma PostgreSQL dédié hébergé sur une instance commune :
+### Prérequis
+* **Docker & Docker Compose** (version 20+)
+* **Java 17 (JDK 17)**
+* **Maven 3.9+**
 
-* `users_schema` : Comptes, mots de passe hashés, rôles.
-* `petpass_schema` : Profils animaux, dossiers médicaux, vaccins, consentements.
-* `booking_schema` : Créneaux d'ouverture, rendez-vous confirmés, file d'attente FIFO.
-* `helpanimal_schema` : Signalements géolocalisés, photos, historique d'états.
-* `rescue_schema` : Missions de secours, intervenants, verrous de concurrence.
-* `pharma_schema` : Catalogues produits, niveaux de stock, réservations avec clé d'idempotence.
-* `adopt_schema` : Annonces refuges, candidatures, formalisation des adoptions.
-* `notification_schema` : Historique des notifications, déduplication, préférences.
-* `admin_schema` : Journaux d'audit de sécurité et statistiques.
+### 1. Démarrage de tous les services avec Docker Compose
+Pour démarrer les 5 microservices et leurs 5 bases de données isolées en une seule commande :
+
+```bash
+docker compose up -d --build
+```
+
+Pour vérifier que tous les conteneurs sont sains et actifs :
+```bash
+docker compose ps
+```
+
+### 2. Démarrage individuel en local (Maven)
+Vous pouvez également démarrer un microservice spécifique en ligne de commande :
+
+```bash
+# Exemple pour Auth Service
+mvn spring-boot:run -pl auth-service
+
+# Exemple pour PetPass Service
+mvn spring-boot:run -pl petpass-service
+```
+
+### 3. Compilation globale et tests
+```bash
+mvn clean test-compile
+```
 
 ---
 
+## 📖 Swagger UI & Documentation OpenAPI
+
+Après démarrage des conteneurs, les documentations interactives Swagger UI sont immédiatement accessibles :
+
+* 🔐 **Auth Service** : [http://localhost:8081/swagger-ui/index.html](http://localhost:8081/swagger-ui/index.html)
+* 🐶 **PetPass Service** : [http://localhost:8082/swagger-ui/index.html](http://localhost:8082/swagger-ui/index.html)
+* 📅 **VetBooking Service** : [http://localhost:8083/swagger-ui/index.html](http://localhost:8083/swagger-ui/index.html)
+* 🚑 **HelpAnimal Service** : [http://localhost:8084/swagger-ui/index.html](http://localhost:8084/swagger-ui/index.html)
+* 🔎 **VetInterop (SOAP)** : WSDL [http://localhost:8087/ws/vetinterop.wsdl](http://localhost:8087/ws/vetinterop.wsdl)
+* 🏡 **AdoptAnimal Service** : [http://localhost:8085/swagger-ui/index.html](http://localhost:8085/swagger-ui/index.html)
+
+Pour chaque service, le bouton **Authorize** permet d'injecter le jeton `Bearer <token>` pour tester les routes sécurisées.
+
+---
+
+## 🧪 Scénario de Test de Bout en Bout
+
+### 1. Connexion & Récupération du JWT
+```bash
+curl -X POST http://localhost:8081/api/auth/connexion \
+  -H "Content-Type: application/json" \
+  -d '{"email":"jean.dupont@test.com","motDePasse":"Password123!"}'
+```
+*Copiez le `token` reçu dans la réponse.*
+
+### 2. Consultation des animaux de l'utilisateur connecté (Agrégation inter-services)
+```bash
+curl -X GET http://localhost:8081/api/utilisateurs/moi/animaux \
+  -H "Authorization: Bearer <VOTRE_TOKEN>"
+```
+
+### 3. Réservation d'un rendez-vous avec vérification d'animal
+```bash
+curl -X POST http://localhost:8083/api/v1/appointments \
+  -H "Authorization: Bearer <VOTRE_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{"slotId":1,"ownerId":1,"petId":1,"consultationType":"GENERAL","reason":"Visite de contrôle"}'
+```
