@@ -1,0 +1,483 @@
+openapi: 3.0.3
+info:
+  title: MediVet Connect — Microservice PetPass API
+  description: |
+    Contrat d'API REST formel pour le microservice **PetPass**.
+    Gère le passeport numérique des animaux (US07-US08), l'historique médical (US09),
+    le carnet de vaccination (US10) et les autorisations d'accès vétérinaires (US12 / RM09).
+  version: 1.0.0
+  contact:
+    name: Équipe MediVet Connect
+    email: contact@medivet.com
+
+servers:
+  - url: http://localhost:8082
+    description: Microservice PetPass (Port 8082)
+
+tags:
+  - name: Animaux & Profils
+    description: Création, mise à jour, suppression et consultation des profils animaux
+  - name: Carnet Médical & Vaccins
+    description: Enregistrement des actes cliniques, des vaccinations et des autorisations vétérinaires
+
+paths:
+  /api/v1/animals:
+    post:
+      tags:
+        - Animaux & Profils
+      summary: Créer un passeport numérique animal (US07)
+      operationId: createAnimal
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnimalRequest'
+      responses:
+        '201':
+          description: Animal créé avec succès
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnimalResponse'
+        '400':
+          description: Validation échouée (nom vide, poids négatif, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Numéro de puce électronique déjà existant (I-CAD)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:
+      tags:
+        - Animaux & Profils
+      summary: Lister tous les animaux
+      operationId: getAllAnimals
+      responses:
+        '200':
+          description: Liste de tous les profils animaux
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnimalResponse'
+
+  /api/v1/animals/{id}:
+    get:
+      tags:
+        - Animaux & Profils
+      summary: Obtenir les détails d'un animal (US08)
+      operationId: getAnimalById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Détails de l'animal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnimalResponse'
+        '404':
+          description: Animal introuvable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags:
+        - Animaux & Profils
+      summary: Modifier la fiche d'un animal
+      operationId: updateAnimal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnimalRequest'
+      responses:
+        '200':
+          description: Animal mis à jour
+    delete:
+      tags:
+        - Animaux & Profils
+      summary: Supprimer un animal
+      operationId: deleteAnimal
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Suppression effectuée
+
+  /api/v1/animals/check-microchip:
+    get:
+      tags:
+        - Animaux & Profils
+      summary: Vérifier si un numéro de puce existe déjà (RM10)
+      operationId: checkMicrochip
+      parameters:
+        - name: microchipId
+          in: query
+          required: true
+          schema:
+            type: string
+            example: "250269600123456"
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exists:
+                    type: boolean
+
+  /api/v1/medical-records:
+    post:
+      tags:
+        - Carnet Médical & Vaccins
+      summary: Ajouter une fiche d'acte médical (US09)
+      operationId: createMedicalRecord
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MedicalRecordRequest'
+      responses:
+        '201':
+          description: Acte médical enregistré
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MedicalRecordResponse'
+
+  /api/v1/medical-records/animal/{animalId}:
+    get:
+      tags:
+        - Carnet Médical & Vaccins
+      summary: Historique médical d'un animal (US09)
+      operationId: getMedicalRecordsByAnimal
+      parameters:
+        - name: animalId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MedicalRecordResponse'
+
+  /api/v1/vaccinations:
+    post:
+      tags:
+        - Carnet Médical & Vaccins
+      summary: Enregistrer un vaccin (US10)
+      operationId: addVaccination
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VaccinationRequest'
+      responses:
+        '201':
+          description: Vaccin consigné dans le carnet de santé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VaccinationResponse'
+
+  /api/v1/vaccinations/animal/{animalId}:
+    get:
+      tags:
+        - Carnet Médical & Vaccins
+      summary: Consulter le carnet vaccinal d'un animal (US10)
+      operationId: getVaccinationsByAnimal
+      parameters:
+        - name: animalId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VaccinationResponse'
+
+  /api/v1/vet-authorizations:
+    post:
+      tags:
+        - Carnet Médical & Vaccins
+      summary: Accorder un droit d'accès au dossier médical (US12 / RM09)
+      operationId: grantVetAuthorization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - animalId
+                - veterinarianId
+              properties:
+                animalId:
+                  type: integer
+                veterinarianId:
+                  type: integer
+                validUntil:
+                  type: string
+                  format: date-time
+      responses:
+        '201':
+          description: Autorisation accordée
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: "Bad Request"
+        message:
+          type: string
+          example: "Validation des données échouée"
+        path:
+          type: string
+          example: "/api/v1/animals"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-11-17T14:00:00"
+
+    AnimalRequest:
+      type: object
+      required:
+        - ownerId
+        - name
+        - species
+      properties:
+        ownerId:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: "Rex"
+        species:
+          type: string
+          example: "CHIEN"
+        breed:
+          type: string
+          example: "Berger Allemand"
+        birthDate:
+          type: string
+          format: date
+          example: "2022-05-10"
+        gender:
+          type: string
+          example: "M"
+        weight:
+          type: number
+          format: double
+          example: 28.5
+        microchipId:
+          type: string
+          example: "250269600123456"
+        photoUrl:
+          type: string
+          example: "https://images.unsplash.com/rex.jpg"
+        description:
+          type: string
+          example: "Chien joueur et très sociable"
+        isSterilized:
+          type: boolean
+          example: true
+        vaccinationStatus:
+          type: string
+          example: "up_to_date"
+        healthStatus:
+          type: string
+          example: "healthy"
+
+    AnimalResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        ownerId:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: "Rex"
+        species:
+          type: string
+          example: "CHIEN"
+        breed:
+          type: string
+          example: "Berger Allemand"
+        birthDate:
+          type: string
+          format: date
+          example: "2022-05-10"
+        gender:
+          type: string
+          example: "M"
+        weight:
+          type: number
+          example: 28.5
+        microchipId:
+          type: string
+          example: "250269600123456"
+        photoUrl:
+          type: string
+        description:
+          type: string
+        isSterilized:
+          type: boolean
+        vaccinationStatus:
+          type: string
+        healthStatus:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    MedicalRecordRequest:
+      type: object
+      required:
+        - animalId
+        - veterinarianId
+        - consultationDate
+        - diagnosis
+      properties:
+        animalId:
+          type: integer
+          example: 1
+        veterinarianId:
+          type: integer
+          example: 5
+        consultationDate:
+          type: string
+          format: date-time
+          example: "2026-11-17T10:00:00"
+        diagnosis:
+          type: string
+          example: "Contrôle annuel de routine"
+        treatment:
+          type: string
+          example: "Antiparasitaire externe"
+        notes:
+          type: string
+          example: "Bonne santé générale"
+
+    MedicalRecordResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        animalId:
+          type: integer
+        veterinarianId:
+          type: integer
+        consultationDate:
+          type: string
+          format: date-time
+        diagnosis:
+          type: string
+        treatment:
+          type: string
+        notes:
+          type: string
+
+    VaccinationRequest:
+      type: object
+      required:
+        - animalId
+        - vaccineName
+        - administeredDate
+      properties:
+        animalId:
+          type: integer
+          example: 1
+        vaccineName:
+          type: string
+          example: "Rage (Rabisin)"
+        administeredDate:
+          type: string
+          format: date
+          example: "2026-11-17"
+        dueDate:
+          type: string
+          format: date
+          example: "2027-11-17"
+        batchNumber:
+          type: string
+          example: "RAB-2026-99A"
+        veterinarianId:
+          type: integer
+          example: 5
+
+    VaccinationResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        animalId:
+          type: integer
+        vaccineName:
+          type: string
+        administeredDate:
+          type: string
+          format: date
+        dueDate:
+          type: string
+          format: date
+        batchNumber:
+          type: string

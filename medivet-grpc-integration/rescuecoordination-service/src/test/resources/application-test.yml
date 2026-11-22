@@ -1,0 +1,14 @@
+# Tests : base H2 en memoire (mode PostgreSQL), serveur gRPC sur un port libre.
+spring:
+  datasource:
+    url: jdbc:h2:mem:rescue;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+rescue:
+  grpc:
+    port: 0
+  reassignment:
+    # La verification RM05 est declenchee a la main dans les tests
+    check-interval-ms: 3600000

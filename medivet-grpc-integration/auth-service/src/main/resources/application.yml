@@ -1,0 +1,30 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://auth-db:5432/auth_db}
+    username: ${SPRING_DATASOURCE_USERNAME:auth_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:auth_password}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+jwt:
+  secret: ${JWT_SECRET:MedivetSecretKey2024SuperLongueClePourLaSecuriteJWT!}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+petpass:
+  service:
+    url: ${PETPASS_SERVICE_URL:http://petpass-service:8082}
+
+vetbooking:
+  service:
+    url: ${VETBOOKING_SERVICE_URL:http://vetbooking-service:8083}

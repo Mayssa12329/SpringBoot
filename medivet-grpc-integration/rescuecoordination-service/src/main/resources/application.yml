@@ -1,0 +1,38 @@
+server:
+  port: ${SERVER_PORT:8086}
+
+spring:
+  application:
+    name: rescuecoordination-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://rescue-db:5432/rescue_db}
+    username: ${SPRING_DATASOURCE_USERNAME:rescue_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:rescue_password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+  jpa:
+    hibernate:
+      ddl-auto: none        # schema gere par Flyway (db/migration)
+    open-in-view: false
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
+rescue:
+  grpc:
+    # Port du serveur gRPC appele par HelpAnimal
+    port: ${RESCUE_GRPC_PORT:9090}
+  reassignment:
+    # RM05 : sans reponse de l'intervenant apres ce delai, la mission est reattribuee
+    timeout-minutes: ${RESCUE_REASSIGN_TIMEOUT_MINUTES:15}
+    # RM05 : au-dela de ce nombre de reattributions, escalade vers l'administrateur
+    max-reassignments: 3
+    # Frequence de verification des missions sans reponse
+    check-interval-ms: 60000

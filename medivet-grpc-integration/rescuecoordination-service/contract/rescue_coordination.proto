@@ -1,0 +1,178 @@
+syntax = "proto3";
+
+package medivet.rescue.v1;
+
+option java_multiple_files = true;
+option java_package = "com.medivet.rescue.grpc";
+option java_outer_classname = "RescueCoordinationProto";
+
+// Contrat entre HelpAnimalService (client) et RescueCoordinationService (serveur).
+// Une copie identique se trouve dans helpanimal-service/src/main/proto : toute modification
+// doit etre faite dans les deux fichiers (contrat d'abord, puis le code).
+service RescueCoordination {
+  // SC2 etape 2 : un signalement qualifie devient une mission ouverte, diffusee aux intervenants.
+  rpc PublishMission (PublishMissionRequest) returns (MissionReply);
+
+  // US23 / RM04 : un intervenant accepte ; la premiere acceptation validee gagne.
+  rpc AssignMission (AssignMissionRequest) returns (AssignMissionResponse);
+
+  // US46 / RM05 : desistement -> nouvelle diffusion (3 reattributions max), puis escalade.
+  rpc DeclineMission (DeclineMissionRequest) returns (MissionReply);
+
+  // US47 : suivi de l'intervention (En cours, Terminee), transmis par HelpAnimal.
+  rpc UpdateMissionStatus (UpdateMissionStatusRequest) returns (MissionReply);
+
+  // Server streaming : nouvelles missions pour les intervenants connectes (US46)
+  // et flux d'etats des missions relaye vers HelpAnimal (US47).
+  rpc WatchMissions (WatchMissionsRequest) returns (stream MissionEvent);
+
+  // Client streaming : l'intervenant envoie sa position GPS pendant le trajet vers l'animal ;
+  // le serveur repond une seule fois, a la fin du flux, avec le bilan du trajet.
+  rpc TrackMission (stream PositionUpdate) returns (TrackingSummary);
+
+  // Bidirectionnel : canal de dispatch d'un intervenant. Le serveur pousse les missions a prendre
+  // (diffusion, rediffusion RM05) et retire celles prises par un autre ou en escalade ;
+  // l'intervenant accepte (RM04), se desiste (US46) ou demarre l'intervention sur le meme flux.
+  rpc Dispatch (stream DispatchCommand) returns (stream DispatchEvent);
+}
+
+enum MissionStatus {
+  MISSION_STATUS_UNSPECIFIED = 0;
+  MISSION_OPEN = 1;
+  MISSION_ASSIGNED = 2;
+  MISSION_IN_PROGRESS = 3;
+  MISSION_COMPLETED = 4;
+  MISSION_ESCALATED = 5;
+}
+
+enum MissionEventType {
+  EVENT_UNSPECIFIED = 0;
+  EVENT_PUBLISHED = 1;
+  EVENT_ASSIGNED = 2;
+  EVENT_DECLINED = 3;
+  EVENT_REASSIGNED = 4;
+  EVENT_ESCALATED = 5;
+  EVENT_IN_PROGRESS = 6;
+  EVENT_COMPLETED = 7;
+}
+
+message PublishMissionRequest {
+  string report_id = 1;
+  double latitude = 2;
+  double longitude = 3;
+  int32 severity = 4;
+  string species = 5;
+}
+
+message AssignMissionRequest {
+  string report_id = 1;
+  string intervenant_id = 2;
+  double latitude = 3;
+  double longitude = 4;
+  int32 severity = 5;
+}
+
+message AssignMissionResponse {
+  enum Result {
+    ASSIGNED = 0;
+    ALREADY_ASSIGNED = 1;
+    REJECTED = 2;
+  }
+  Result result = 1;
+  string mission_id = 2;
+  string message = 3;
+}
+
+message DeclineMissionRequest {
+  string report_id = 1;
+  string intervenant_id = 2;
+  string reason = 3;
+}
+
+message UpdateMissionStatusRequest {
+  string report_id = 1;
+  string intervenant_id = 2;
+  // MISSION_IN_PROGRESS ou MISSION_COMPLETED
+  MissionStatus status = 3;
+}
+
+message MissionReply {
+  string mission_id = 1;
+  MissionStatus status = 2;
+  int32 reassignments = 3;
+  string message = 4;
+}
+
+message WatchMissionsRequest {
+  // Types d'evenements souhaites ; vide = tous.
+  repeated MissionEventType types = 1;
+}
+
+message MissionEvent {
+  string mission_id = 1;
+  string report_id = 2;
+  MissionEventType type = 3;
+  MissionStatus status = 4;
+  string intervenant_id = 5;
+  double latitude = 6;
+  double longitude = 7;
+  int32 severity = 8;
+  int32 reassignments = 9;
+  string occurred_at = 10;
+  string message = 11;
+}
+
+message PositionUpdate {
+  string report_id = 1;
+  string intervenant_id = 2;
+  double latitude = 3;
+  double longitude = 4;
+  // ISO-8601 (ex. 2026-11-22T10:15:30Z) ; vide = heure de reception.
+  string recorded_at = 5;
+}
+
+message TrackingSummary {
+  string mission_id = 1;
+  int32 points = 2;
+  double distance_km = 3;
+  int64 duration_seconds = 4;
+  // Distance entre la derniere position recue et l'animal.
+  double remaining_km = 5;
+  // Vrai si la derniere position est a moins de 100 m de l'animal.
+  bool arrived = 6;
+}
+
+message DispatchCommand {
+  enum Action {
+    ACTION_UNSPECIFIED = 0;
+    CONNECT = 1;  // premier message du flux : identifie l'intervenant
+    ACCEPT = 2;   // RM04 : premiere acceptation validee gagnante
+    DECLINE = 3;  // US46 / RM05
+    START = 4;    // sur place : intervention demarree
+  }
+  Action action = 1;
+  string intervenant_id = 2;  // CONNECT
+  string report_id = 3;       // ACCEPT, DECLINE, START
+  string reason = 4;          // DECLINE (facultatif)
+}
+
+message DispatchEvent {
+  enum Kind {
+    KIND_UNSPECIFIED = 0;
+    OFFER = 1;      // mission ouverte, a prendre
+    WITHDRAWN = 2;  // mission prise par un autre intervenant ou passee en escalade
+    CONFIRMED = 3;  // commande appliquee
+    REFUSED = 4;    // commande refusee (mission deja prise, etat incompatible...)
+  }
+  Kind kind = 1;
+  // Commande a laquelle repond un evenement CONFIRMED ou REFUSED.
+  DispatchCommand.Action action = 2;
+  string mission_id = 3;
+  string report_id = 4;
+  MissionStatus status = 5;
+  double latitude = 6;
+  double longitude = 7;
+  int32 severity = 8;
+  string species = 9;
+  string message = 10;
+}

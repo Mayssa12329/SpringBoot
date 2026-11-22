@@ -1,0 +1,414 @@
+openapi: 3.0.3
+info:
+  title: MediVet Connect — Microservice Authentification API
+  description: |
+    Contrat d'API REST formel pour le microservice **Authentification & Utilisateurs**.
+    Gère l'inscription des utilisateurs et praticiens, l'authentification JWT (US01-US02),
+    la réinitialisation de mot de passe (US05) et les profils utilisateurs (US03).
+  version: 1.0.0
+  contact:
+    name: Équipe MediVet Connect
+    email: contact@medivet.com
+
+servers:
+  - url: http://localhost:8081
+    description: Microservice Auth & Utilisateurs (Port 8081)
+
+tags:
+  - name: Authentification & Sécurité
+    description: Inscription, connexion JWT et réinitialisation de mot de passe
+  - name: Utilisateurs & Profils
+    description: Consultation et modification du profil connecté
+
+paths:
+  /api/auth/inscription:
+    post:
+      tags:
+        - Authentification & Sécurité
+      summary: Inscription d'un propriétaire d'animaux (US01)
+      operationId: registerOwner
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Compte créé avec succès
+          content:
+            text/plain:
+              example: "Compte créé avec succès !"
+        '400':
+          description: Données de formulaire invalides
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email déjà existant en base
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/inscription-pro:
+    post:
+      tags:
+        - Authentification & Sécurité
+      summary: Inscription professionnelle Vétérinaire avec justificatif (US01)
+      operationId: registerPro
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - nom
+                - prenom
+                - email
+                - motDePasse
+                - telephone
+                - diplome
+              properties:
+                nom:
+                  type: string
+                  example: "Martin"
+                prenom:
+                  type: string
+                  example: "Sarah"
+                email:
+                  type: string
+                  format: email
+                  example: "sarah.martin@medivet.com"
+                motDePasse:
+                  type: string
+                  format: password
+                  example: "Pass1234!"
+                telephone:
+                  type: string
+                  example: "+33612345678"
+                diplome:
+                  type: string
+                  format: binary
+                  description: Justificatif ou diplôme officiel (PDF, PNG, JPG)
+      responses:
+        '201':
+          description: Compte professionnel créé en attente de validation admin
+        '400':
+          description: Fichier manquant ou formulaire invalide
+        '409':
+          description: Email déjà existant
+
+  /api/auth/connexion:
+    post:
+      tags:
+        - Authentification & Sécurité
+      summary: Connexion et obtention du Token JWT (US02)
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authentification réussie
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Identifiants invalides (email ou mot de passe incorrect)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/auth/mot-de-passe-oublie:
+    post:
+      tags:
+        - Authentification & Sécurité
+      summary: Demande de réinitialisation de mot de passe (US05)
+      operationId: forgotPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: "jean.dupont@medivet.com"
+      responses:
+        '200':
+          description: Token de réinitialisation généré si le compte existe
+
+  /api/auth/reinitialiser-mot-de-passe:
+    post:
+      tags:
+        - Authentification & Sécurité
+      summary: Réinitialisation du mot de passe avec le token (US05)
+      operationId: resetPassword
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+                - nouveauMotDePasse
+              properties:
+                token:
+                  type: string
+                  example: "a8f3b21c-4d5e-6f7a-8b9c-0d1e2f3a4b5c"
+                nouveauMotDePasse:
+                  type: string
+                  format: password
+                  example: "NouveauPass1234!"
+      responses:
+        '200':
+          description: Mot de passe réinitialisé avec succès
+        '400':
+          description: Token invalide ou expiré
+
+  /api/utilisateurs/moi:
+    get:
+      tags:
+        - Utilisateurs & Profils
+      summary: Consulter son propre profil connecté (US03)
+      operationId: getMyProfile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Profil de l'utilisateur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          description: Non authentifié
+    put:
+      tags:
+        - Utilisateurs & Profils
+      summary: Mettre à jour son profil (US03)
+      operationId: updateMyProfile
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nom:
+                  type: string
+                prenom:
+                  type: string
+                telephone:
+                  type: string
+      responses:
+        '200':
+          description: Profil mis à jour
+
+  /api/utilisateurs/moi/animaux:
+    get:
+      tags:
+        - Utilisateurs & Profils
+      summary: Récupérer mes animaux (Liaison inter-service PetPass)
+      description: Retourne automatiquement les animaux du propriétaire connecté via son JWT
+      operationId: getMyAnimals
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Liste des animaux du propriétaire
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnimalResponse'
+
+  /api/utilisateurs/moi/rendez-vous:
+    get:
+      tags:
+        - Utilisateurs & Profils
+      summary: Récupérer mes rendez-vous (Liaison inter-service VetBooking)
+      description: Retourne automatiquement les consultations de l'utilisateur connecté via son JWT
+      operationId: getMyAppointments
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Historique des consultations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AppointmentResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Saisissez le Token JWT obtenu via /api/auth/connexion (ex. Bearer eyJhbGci...)
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: "Bad Request"
+        message:
+          type: string
+          example: "Validation des données échouée"
+        path:
+          type: string
+          example: "/api/auth/connexion"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-11-17T14:00:00"
+
+    RegisterRequest:
+      type: object
+      required:
+        - nom
+        - prenom
+        - email
+        - motDePasse
+        - telephone
+      properties:
+        nom:
+          type: string
+          example: "Dupont"
+        prenom:
+          type: string
+          example: "Jean"
+        email:
+          type: string
+          format: email
+          example: "jean.dupont@medivet.com"
+        motDePasse:
+          type: string
+          format: password
+          example: "Pass1234!"
+        telephone:
+          type: string
+          example: "+33612345678"
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - motDePasse
+      properties:
+        email:
+          type: string
+          format: email
+          example: "jean.dupont@medivet.com"
+        motDePasse:
+          type: string
+          format: password
+          example: "Pass1234!"
+
+    LoginResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        token:
+          type: string
+          example: "eyJhbGciOiJIUzI1NiJ9..."
+        email:
+          type: string
+          example: "jean.dupont@medivet.com"
+        role:
+          type: string
+          example: "UTILISATEUR"
+        nom:
+          type: string
+          example: "Dupont"
+        prenom:
+          type: string
+          example: "Jean"
+        demandeVeterinaire:
+          type: boolean
+          example: false
+        diplomeUrl:
+          type: string
+          nullable: true
+          example: null
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        nom:
+          type: string
+        prenom:
+          type: string
+        email:
+          type: string
+        telephone:
+          type: string
+        role:
+          type: string
+
+    AnimalResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        ownerId:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: "Rex"
+        species:
+          type: string
+          example: "CHIEN"
+        breed:
+          type: string
+          example: "Berger Allemand"
+
+    AppointmentResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 42
+        slotId:
+          type: integer
+        ownerId:
+          type: integer
+        petId:
+          type: integer
+        consultationType:
+          type: string
+        status:
+          type: string
+          example: "CONFIRMED"
