@@ -1,0 +1,193 @@
+<form class="card" novalidate (submit)="$event.preventDefault(); submit(fileInput)">
+  <header>
+    <app-icon name="megaphone" [size]="28" />
+    <div>
+      <h2>Signaler un animal en détresse</h2>
+      <p>Aidez-nous à intervenir rapidement en partageant les détails de la situation.</p>
+    </div>
+  </header>
+
+  <section>
+    <h3><span class="step">1</span> Type de signalement</h3>
+    <div class="categories" role="radiogroup" aria-label="Type de signalement">
+      @for (category of mainCategories; track category.value) {
+        <button
+          type="button"
+          role="radio"
+          class="category"
+          [class.selected]="mainCategory() === category.value"
+          [attr.aria-checked]="mainCategory() === category.value"
+          (click)="mainCategory.set(category.value)"
+        >
+          @if (mainCategory() === category.value) {
+            <span class="tick"><app-icon name="check" [size]="12" /></span>
+          }
+          <app-icon [name]="category.icon" [size]="24" />
+          <span>{{ category.label }}</span>
+        </button>
+      }
+    </div>
+    @if (mainCategory() === 'OTHER') {
+      <select
+        #other
+        class="field other"
+        aria-label="Précisez le type"
+        (change)="selectOtherCategory(other.value)"
+      >
+        @for (category of otherCategories; track category.value) {
+          <option [value]="category.value">{{ category.label }}</option>
+        }
+      </select>
+    }
+    <div class="species-row">
+      <label>
+        <span class="label">Espèce</span>
+        <input
+          #speciesInput
+          id="species"
+          class="field"
+          list="species-list"
+          maxlength="50"
+          placeholder="ex. chien"
+          [value]="species()"
+          (input)="species.set(speciesInput.value)"
+          [attr.aria-invalid]="submitted() && speciesInvalid()"
+        />
+        <datalist id="species-list">
+          <option value="Chien"></option>
+          <option value="Chat"></option>
+          <option value="Oiseau"></option>
+          <option value="Lapin"></option>
+          <option value="Cheval"></option>
+        </datalist>
+        @if (submitted() && speciesInvalid()) {
+          <small class="error-text">L'espèce est obligatoire.</small>
+        }
+      </label>
+      <div>
+        <span class="label" id="severity-label">Gravité</span>
+        <div class="severity" role="radiogroup" aria-labelledby="severity-label">
+          @for (level of severities; track level) {
+            <button
+              type="button"
+              role="radio"
+              [class.selected]="severity() === level"
+              [attr.aria-checked]="severity() === level"
+              (click)="severity.set(level)"
+            >
+              {{ level }}
+            </button>
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h3><span class="step">2</span> Ajouter une photo</h3>
+    <div class="photos">
+      <button
+        type="button"
+        class="dropzone"
+        [class.dragging]="dragging()"
+        (click)="fileInput.click()"
+        (dragover)="onDragOver($event)"
+        (dragleave)="dragging.set(false)"
+        (drop)="onDrop($event)"
+      >
+        <app-icon name="camera" [size]="26" />
+        <strong>Cliquez pour ajouter une photo</strong>
+        <small>ou glissez-déposez (JPEG, PNG, 5 Mo max)</small>
+      </button>
+      <input
+        #fileInput
+        type="file"
+        accept="image/jpeg,image/png"
+        hidden
+        (change)="selectPhoto(fileInput.files?.[0])"
+      />
+      @if (photoPreview(); as preview) {
+        <div class="preview">
+          <img [src]="preview" alt="Aperçu de la photo" />
+          <button type="button" aria-label="Retirer la photo" (click)="removePhoto(fileInput)">
+            <app-icon name="close" [size]="14" />
+          </button>
+        </div>
+      }
+    </div>
+    @if (photoError(); as error) {
+      <small class="error-text">{{ error }}</small>
+    } @else if (submitted() && photoMissing()) {
+      <small class="error-text">La photo est obligatoire.</small>
+    }
+  </section>
+
+  <section>
+    <h3><span class="step">3</span> Localisation</h3>
+    <div class="location">
+      <div class="input-icon">
+        <app-icon name="pin" [size]="18" />
+        <input
+          #locationInput
+          class="field"
+          placeholder="Latitude, longitude ou cliquez sur la carte"
+          aria-label="Position"
+          [value]="locationText()"
+          (input)="locationText.set(locationInput.value)"
+          (change)="applyTypedLocation()"
+        />
+      </div>
+      <button
+        type="button"
+        class="locate"
+        (click)="useMyLocation()"
+        aria-label="Utiliser ma position"
+        title="Utiliser ma position"
+      >
+        <app-icon name="locate" />
+      </button>
+    </div>
+    @if (submitted() && positionInvalid()) {
+      <small class="error-text"
+        >Choisissez une position valide sur la carte ou saisissez « latitude, longitude ».</small
+      >
+    }
+  </section>
+
+  <section>
+    <h3><span class="step">4</span> Description</h3>
+    <div class="textarea">
+      <textarea
+        #descriptionInput
+        class="field"
+        rows="3"
+        [attr.maxlength]="maxDescription"
+        placeholder="Décrivez la situation en détail..."
+        aria-label="Description"
+        [value]="description()"
+        (input)="description.set(descriptionInput.value)"
+      ></textarea>
+      <small>{{ description().length }}/{{ maxDescription }}</small>
+    </div>
+    @if (submitted() && descriptionInvalid()) {
+      <small class="error-text">La description est obligatoire.</small>
+    }
+  </section>
+
+  @if (serverError(); as error) {
+    <p class="server-error" role="alert">
+      {{ error }}
+      @if (duplicateId(); as id) {
+        <button type="button" (click)="openDuplicate(id)">Voir le signalement #{{ id }}</button>
+      }
+    </p>
+  }
+
+  @if (!auth.session()) {
+    <p class="login-hint">Connectez-vous en haut à droite pour envoyer un signalement.</p>
+  }
+  <button type="submit" class="btn btn-primary submit" [disabled]="sending() || !auth.session()">
+    <app-icon name="send" [size]="18" />
+    {{ sending() ? 'Envoi en cours...' : 'Envoyer le signalement' }}
+  </button>
+</form>

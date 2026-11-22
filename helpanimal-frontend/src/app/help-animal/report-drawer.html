@@ -1,0 +1,185 @@
+@if (selectedId() !== null) {
+  <div class="backdrop" (click)="close()"></div>
+  <aside role="dialog" aria-modal="true" aria-label="Détail du signalement">
+    <button type="button" class="close" aria-label="Fermer" (click)="close()">
+      <app-icon name="close" />
+    </button>
+
+    @if (report(); as r) {
+      <img class="photo" [src]="r.photoUrl" [alt]="categoryLabels[r.category]" />
+
+      <div class="body">
+        <p class="id">Signalement #{{ r.id }}</p>
+        <h2>{{ categoryLabels[r.category] }}</h2>
+        <ul class="facts">
+          <li>
+            <span>Espèce</span><strong class="capitalize">{{ r.species }}</strong>
+          </li>
+          <li>
+            <span>Gravité</span><strong>{{ r.severity }}/5</strong>
+          </li>
+          <li>
+            <span>Priorité</span><strong>{{ r.priorityScore }}</strong>
+          </li>
+          <li>
+            <span>Signalé le</span><strong>{{ r.createdAt | date: 'dd/MM/yyyy HH:mm' }}</strong>
+          </li>
+        </ul>
+        <p class="description">{{ r.description }}</p>
+        <p class="position">
+          <app-icon name="pin" [size]="16" /> {{ r.latitude }}, {{ r.longitude }}
+        </p>
+        @if (r.petpassAnimalId) {
+          <p class="petpass">
+            <app-icon name="pass" [size]="16" /> Enregistré dans PetPass (animal n°{{
+              r.petpassAnimalId
+            }})
+          </p>
+        }
+
+        <h3>Suivi du sauvetage</h3>
+        @if (r.status === 'REJETE' || r.status === 'MASQUE') {
+          <p class="closed">Ce signalement est {{ statusLabels[r.status].toLowerCase() }}.</p>
+        } @else {
+          <ol class="steps">
+            @for (step of lifecycle; track step; let i = $index) {
+              <li [class.done]="i <= currentStep()" [class.current]="i === currentStep()">
+                <span class="bullet">
+                  @if (i < currentStep()) {
+                    <app-icon name="check" [size]="12" />
+                  }
+                </span>
+                {{ statusLabels[step] }}
+              </li>
+            }
+          </ol>
+        }
+
+        @if (actions(); as a) {
+          @if (reasonFor()) {
+            <div class="reason">
+              <label for="reason">{{
+                reasonFor() === 'hide' ? 'Motif du masquage' : 'Motif du rejet'
+              }}</label>
+              <textarea
+                #reasonInput
+                id="reason"
+                class="field"
+                rows="2"
+                maxlength="500"
+                [value]="reason()"
+                (input)="reason.set(reasonInput.value)"
+              ></textarea>
+              <div class="buttons">
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  [disabled]="busy()"
+                  (click)="confirmReason(r)"
+                >
+                  Confirmer
+                </button>
+                <button type="button" class="btn" [disabled]="busy()" (click)="cancelReason()">
+                  Annuler
+                </button>
+              </div>
+            </div>
+          } @else {
+            <div class="buttons">
+              @if (a.qualify) {
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  [disabled]="busy()"
+                  (click)="setStatus(r, 'QUALIFIE', 'Signalement vérifié')"
+                >
+                  Qualifier
+                </button>
+              }
+              @if (a.accept) {
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  [disabled]="busy()"
+                  (click)="accept(r)"
+                >
+                  Accepter la mission
+                </button>
+              }
+              @if (a.start) {
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  [disabled]="busy()"
+                  (click)="setStatus(r, 'EN_COURS', 'Intervention démarrée')"
+                >
+                  Démarrer l'intervention
+                </button>
+              }
+              @if (a.finish) {
+                <button
+                  type="button"
+                  class="btn btn-primary"
+                  [disabled]="busy()"
+                  (click)="setStatus(r, 'TERMINE', 'Sauvetage terminé')"
+                >
+                  Terminer le sauvetage
+                </button>
+              }
+              @if (a.relocate) {
+                <button type="button" class="btn" [disabled]="busy()" (click)="startRelocation(r)">
+                  Corriger la position
+                </button>
+              }
+              @if (a.reject) {
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  [disabled]="busy()"
+                  (click)="reasonFor.set('reject')"
+                >
+                  Rejeter
+                </button>
+              }
+              @if (a.hide) {
+                <button
+                  type="button"
+                  class="btn btn-danger"
+                  [disabled]="busy()"
+                  (click)="reasonFor.set('hide')"
+                >
+                  Masquer
+                </button>
+              }
+            </div>
+          }
+        }
+        @if (error(); as message) {
+          <p class="error-text" role="alert">{{ message }}</p>
+        }
+
+        <h3>Historique</h3>
+        @if (r.history; as history) {
+          <ul class="history">
+            @for (entry of history; track $index) {
+              <li>
+                <strong>{{ statusLabels[entry.toStatus] }}</strong>
+                <small
+                  >{{ entry.changedAt | date: 'dd/MM/yyyy HH:mm' }} · utilisateur
+                  {{ entry.actorId }}</small
+                >
+                @if (entry.comment) {
+                  <span>{{ entry.comment }}</span>
+                }
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="muted">Visible par l'auteur, l'intervenant attribué et l'administrateur.</p>
+        }
+      </div>
+    } @else {
+      <p class="loading">Chargement...</p>
+    }
+  </aside>
+}

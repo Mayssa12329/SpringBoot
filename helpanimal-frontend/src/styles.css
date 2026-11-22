@@ -1,0 +1,181 @@
+:root {
+  --green-900: #0a5a42;
+  --green-700: #0e6f52;
+  --green-500: #23a06f;
+  --mint-300: #bfeacf;
+  --mint-200: #d6f3e2;
+  --mint-100: #e9f8ef;
+  --surface: #ffffff;
+  --page: #f5faf7;
+  --ink: #12261d;
+  --muted: #5f7069;
+  --line: #e2ece6;
+  --red: #e5484d;
+  --orange: #f59e0b;
+  --blue: #2f7fd6;
+  --shadow: 0 8px 26px rgba(16, 66, 46, 0.08);
+  --radius: 20px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--green-500);
+  outline-offset: 2px;
+}
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.field {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+.field:focus {
+  border-color: var(--green-500);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--mint-200);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 9px 16px;
+  font-weight: 700;
+  background: var(--mint-100);
+  color: var(--green-900);
+}
+.btn:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+.btn:disabled {
+  opacity: 0.55;
+}
+.btn-primary {
+  background: var(--green-700);
+  color: #fff;
+}
+.btn-danger {
+  background: #fdecec;
+  color: #b42328;
+}
+
+.error-text {
+  color: #b42328;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* Popup de la carte (contenu cree hors des composants Angular) */
+.leaflet-container {
+  font-family: inherit;
+  background: #eef3ef;
+}
+.leaflet-tile-pane {
+  filter: saturate(0.55) brightness(1.05);
+}
+.leaflet-popup-content-wrapper {
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+.leaflet-popup-content {
+  margin: 10px;
+}
+.map-popup {
+  display: flex;
+  gap: 12px;
+  min-width: 240px;
+}
+.map-popup img {
+  width: 84px;
+  height: 84px;
+  object-fit: cover;
+  border-radius: 12px;
+  background: var(--mint-100);
+}
+.map-popup strong {
+  display: block;
+  font-size: 14px;
+}
+.map-popup strong::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--red);
+}
+.map-popup span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 3px;
+}
+.map-popup button {
+  margin-top: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green-700);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+/* Marqueurs de la carte */
+.map-pin {
+  background: none;
+  border: 0;
+}
+.map-pin svg {
+  display: block;
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.3));
+}
