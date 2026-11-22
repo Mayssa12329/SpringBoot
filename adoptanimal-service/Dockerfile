@@ -7,7 +7,7 @@ COPY pom.xml .
 COPY src/main/resources/xsd ./src/main/resources/xsd
 RUN mvn -B dependency:go-offline
 COPY src ./src
-RUN mvn -B package -DskipTests
+RUN mvn -B package -Dmaven.test.skip=true
 
 FROM eclipse-temurin:17-jre
 WORKDIR /app

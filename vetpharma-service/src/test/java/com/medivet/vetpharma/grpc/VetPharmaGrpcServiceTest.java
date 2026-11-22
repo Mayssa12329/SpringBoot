@@ -352,8 +352,8 @@ class VetPharmaGrpcServiceTest {
                     ListerPharmaciesRequest.newBuilder().setVille("").build());
 
             assertThat(resp.getPharmaciesList()).hasSize(1);
-            assertThat(resp.getPharmacie(0).getNom()).isEqualTo("PharmaVet Tunis");
-            assertThat(resp.getPharmacie(0).getVille()).isEqualTo("Tunis");
+            assertThat(resp.getPharmacies(0).getNom()).isEqualTo("PharmaVet Tunis");
+            assertThat(resp.getPharmacies(0).getVille()).isEqualTo("Tunis");
         }
 
         @Test
@@ -365,7 +365,7 @@ class VetPharmaGrpcServiceTest {
             ListerPharmaciesResponse resp = stub.listerPharmacies(
                     ListerPharmaciesRequest.newBuilder().setVille("Sfax").build());
 
-            assertThat(resp.getPharmacie(0).getVille()).isEqualTo("Sfax");
+            assertThat(resp.getPharmacies(0).getVille()).isEqualTo("Sfax");
         }
 
         @Test

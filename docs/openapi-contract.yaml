@@ -1,0 +1,921 @@
+openapi: 3.0.3
+
+info:
+  title: MediVet Connect — VetBookingService
+  description: |
+    API REST du service de réservation vétérinaire de la plateforme MediVet Connect.
+
+    ## Fonctionnalités couvertes
+    - **US13** : Recherche de vétérinaires par spécialité et ville
+    - **US14** : Gestion des disponibilités (créneaux)
+    - **US15** : Réservation de rendez-vous sans conflit (RM06, RM07)
+    - **US16** : Modification et annulation de rendez-vous
+    - **US17** : Notifications persistées en base de données
+    - **US18** : Liste d'attente FIFO avec expiration 30 minutes (RM08)
+
+    ## Règles métier
+    - **RM06** : Un créneau ne peut avoir qu'un seul rendez-vous confirmé
+    - **RM07** : Le type de consultation doit correspondre à la spécialité du vétérinaire
+    - **RM08** : Liste d'attente FIFO — offre valable 30 minutes
+    - **RM14** : Notifications idempotentes (clé unique par événement)
+
+  version: 1.0.0
+  contact:
+    name: Ingénieur 2 — Sondes
+    email: sondes@medivet.tn
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Serveur de développement local
+
+tags:
+  - name: Vets
+    description: Profils et disponibilités des vétérinaires (US13, US14)
+  - name: Appointments
+    description: Réservation, modification et annulation (US15, US16)
+  - name: WaitingList
+    description: Liste d'attente FIFO (US18)
+  - name: Notifications
+    description: Notifications persistées (US17)
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  PATHS
+# ══════════════════════════════════════════════════════════════════════════════
+paths:
+
+  # ── Vétérinaires ────────────────────────────────────────────────────────────
+
+  /vets:
+    get:
+      tags: [Vets]
+      summary: Rechercher des vétérinaires (US13)
+      description: |
+        Filtre les vétérinaires actifs par ville et/ou type de consultation.
+        Les deux paramètres sont optionnels — les omettre retourne tous les vétérinaires.
+      operationId: searchVets
+      parameters:
+        - name: city
+          in: query
+          required: false
+          description: Filtrer par ville (insensible à la casse)
+          schema:
+            type: string
+            example: Tunis
+        - name: consultationType
+          in: query
+          required: false
+          description: Filtrer par spécialité (RM07 — un vétérinaire = une spécialité)
+          schema:
+            $ref: '#/components/schemas/ConsultationType'
+      responses:
+        '200':
+          description: Liste des vétérinaires correspondants
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VetResponse'
+
+    post:
+      tags: [Vets]
+      summary: Enregistrer un nouveau vétérinaire
+      operationId: createVet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VetRequest'
+      responses:
+        '201':
+          description: Vétérinaire créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VetResponse'
+        '409':
+          description: Email déjà utilisé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /vets/{id}:
+    get:
+      tags: [Vets]
+      summary: Obtenir un vétérinaire par ID
+      operationId: getVet
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Vétérinaire trouvé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VetResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Vets]
+      summary: Modifier le profil d'un vétérinaire
+      operationId: updateVet
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VetRequest'
+      responses:
+        '200':
+          description: Vétérinaire mis à jour
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VetResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Email déjà utilisé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    delete:
+      tags: [Vets]
+      summary: Désactiver un vétérinaire (soft delete)
+      operationId: deactivateVet
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '204':
+          description: Vétérinaire désactivé
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Créneaux ────────────────────────────────────────────────────────────────
+
+  /vets/{vetId}/slots:
+    get:
+      tags: [Vets]
+      summary: Lister tous les créneaux d'un vétérinaire (US14)
+      operationId: getSlots
+      parameters:
+        - name: vetId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Liste de tous les créneaux (AVAILABLE + BOOKED + BLOCKED)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SlotResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      tags: [Vets]
+      summary: Créer un créneau pour un vétérinaire (US14)
+      operationId: createSlot
+      parameters:
+        - name: vetId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlotRequest'
+      responses:
+        '201':
+          description: Créneau créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Créneau chevauchant déjà existant
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /vets/{vetId}/slots/available:
+    get:
+      tags: [Vets]
+      summary: Lister les créneaux disponibles d'un vétérinaire pour une date
+      operationId: getAvailableSlots
+      parameters:
+        - name: vetId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+            example: "2026-11-10"
+      responses:
+        '200':
+          description: Liste des créneaux AVAILABLE
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SlotResponse'
+
+  /vets/slots/{slotId}/block:
+    patch:
+      tags: [Vets]
+      summary: Bloquer un créneau AVAILABLE (US14)
+      description: Retourne 422 si le créneau est BOOKED — annuler le RDV d'abord.
+      operationId: blockSlot
+      parameters:
+        - name: slotId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Créneau bloqué
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Impossible de bloquer un créneau BOOKED
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /vets/slots/{slotId}/open:
+    patch:
+      tags: [Vets]
+      summary: Réouvrir un créneau BLOCKED (US14)
+      operationId: openSlot
+      parameters:
+        - name: slotId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Créneau réouvert
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Rendez-vous ─────────────────────────────────────────────────────────────
+
+  /appointments:
+    post:
+      tags: [Appointments]
+      summary: Réserver un rendez-vous (US15)
+      description: |
+        Applique un verrou pessimiste sur le créneau (RM06).
+        Vérifie la compatibilité de la spécialité (RM07).
+        Publie un événement APPOINTMENT_CONFIRMED vers NotificationService (US17).
+      operationId: bookAppointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentRequest'
+      responses:
+        '201':
+          description: Rendez-vous confirmé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Créneau déjà réservé (RM06)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Spécialité incompatible (RM07)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /appointments/{id}:
+    get:
+      tags: [Appointments]
+      summary: Obtenir un rendez-vous par ID
+      operationId: getAppointment
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Rendez-vous trouvé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Appointments]
+      summary: Modifier un rendez-vous — reschedule ou notes (US16)
+      description: |
+        Deux cas :
+        - **newSlotId fourni** : déplace le RDV sur un nouveau créneau du même vétérinaire.
+          L'ancien créneau est libéré et la liste d'attente est déclenchée (RM08).
+        - **newSlotId absent** : met à jour les notes uniquement.
+        Publie APPOINTMENT_MODIFIED vers NotificationService (US17).
+      operationId: modifyAppointment
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentModifyRequest'
+      responses:
+        '200':
+          description: Rendez-vous modifié
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Nouveau créneau déjà réservé (RM06)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Statut invalide ou vétérinaire différent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /appointments/{id}/cancel:
+    patch:
+      tags: [Appointments]
+      summary: Annuler un rendez-vous (US16)
+      description: |
+        - Annulation < 2h avant le début → statut LATE_CANCELLED (RM07).
+        - Libère le créneau et déclenche la liste d'attente (RM08).
+        - Publie APPOINTMENT_CANCELLED vers NotificationService (US17).
+      operationId: cancelAppointment
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Rendez-vous annulé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Statut non annulable (COMPLETED, déjà annulé)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /appointments/{id}/complete:
+    patch:
+      tags: [Appointments]
+      summary: Marquer un rendez-vous comme terminé
+      operationId: completeAppointment
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Rendez-vous complété
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentResponse'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /appointments/owner/{ownerId}:
+    get:
+      tags: [Appointments]
+      summary: Lister les rendez-vous d'un propriétaire (US16)
+      operationId: getAppointmentsByOwner
+      parameters:
+        - name: ownerId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Liste des rendez-vous
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AppointmentResponse'
+
+  /appointments/vet/{vetId}:
+    get:
+      tags: [Appointments]
+      summary: Lister les rendez-vous d'un vétérinaire
+      operationId: getAppointmentsByVet
+      parameters:
+        - name: vetId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Liste des rendez-vous
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AppointmentResponse'
+
+  # ── Liste d'attente ─────────────────────────────────────────────────────────
+
+  /waiting-list:
+    post:
+      tags: [WaitingList]
+      summary: Rejoindre la liste d'attente d'un créneau (US18)
+      description: |
+        Inscrit le propriétaire en FIFO sur la liste d'attente du créneau (RM08).
+        Retourne 409 si le propriétaire est déjà inscrit sur ce créneau.
+      operationId: joinWaitingList
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WaitingListRequest'
+      responses:
+        '201':
+          description: Inscription créée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaitingListResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Propriétaire déjà inscrit sur ce créneau
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /waiting-list/{id}/accept:
+    patch:
+      tags: [WaitingList]
+      summary: Accepter une proposition de créneau (US18)
+      description: |
+        Accepte l'offre dans la fenêtre de 30 minutes (RM08).
+        Crée un vrai Appointment + marque le créneau BOOKED.
+        Publie APPOINTMENT_CONFIRMED vers NotificationService (US17).
+        Retourne 422 si l'offre a expiré.
+      operationId: acceptOffer
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Offre acceptée — rendez-vous créé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaitingListResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Offre expirée ou créneau non disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /waiting-list/{id}/cancel:
+    patch:
+      tags: [WaitingList]
+      summary: Annuler une inscription à la liste d'attente (US18)
+      operationId: cancelWaitingListEntry
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+      responses:
+        '200':
+          description: Inscription annulée
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaitingListResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /waiting-list/owner/{ownerId}:
+    get:
+      tags: [WaitingList]
+      summary: Lister les inscriptions d'un propriétaire (US18)
+      operationId: getWaitingListByOwner
+      parameters:
+        - name: ownerId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Liste des inscriptions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WaitingListResponse'
+
+  /waiting-list/slot/{slotId}:
+    get:
+      tags: [WaitingList]
+      summary: Lister les inscriptions pour un créneau (vue vétérinaire)
+      operationId: getWaitingListBySlot
+      parameters:
+        - name: slotId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Liste ordonnée FIFO
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/WaitingListResponse'
+
+  # ── Notifications ───────────────────────────────────────────────────────────
+
+  /notifications/user/{recipientId}:
+    get:
+      tags: [Notifications]
+      summary: Toutes les notifications d'un utilisateur (US17)
+      operationId: getNotifications
+      parameters:
+        - name: recipientId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Liste des notifications (plus récente en premier)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationResponse'
+
+  /notifications/user/{recipientId}/unread:
+    get:
+      tags: [Notifications]
+      summary: Notifications non lues d'un utilisateur
+      operationId: getUnreadNotifications
+      parameters:
+        - name: recipientId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Notifications UNREAD
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationResponse'
+
+  /notifications/user/{recipientId}/unread/count:
+    get:
+      tags: [Notifications]
+      summary: Nombre de notifications non lues (badge)
+      operationId: countUnread
+      parameters:
+        - name: recipientId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Compteur
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  unreadCount:
+                    type: integer
+                    example: 3
+
+  /notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Marquer une notification comme lue
+      operationId: markRead
+      parameters:
+        - $ref: '#/components/parameters/IdPath'
+        - name: recipientId
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Notification marquée lue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: La notification n'appartient pas à cet utilisateur
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /notifications/user/{recipientId}/read-all:
+    patch:
+      tags: [Notifications]
+      summary: Marquer toutes les notifications comme lues
+      operationId: markAllRead
+      parameters:
+        - name: recipientId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Nombre de notifications mises à jour
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  updated:
+                    type: integer
+                    example: 5
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  COMPONENTS
+# ══════════════════════════════════════════════════════════════════════════════
+components:
+
+  parameters:
+    IdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        example: 1
+
+  responses:
+    NotFound:
+      description: Ressource introuvable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    UnprocessableEntity:
+      description: Opération impossible dans l'état actuel
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+
+    # ── Enums ──────────────────────────────────────────────────────────────────
+
+    ConsultationType:
+      type: string
+      enum: [GENERAL, SURGERY, DERMATOLOGY, CARDIOLOGY, ORTHOPEDICS, OPHTHALMOLOGY, DENTISTRY, EMERGENCY]
+      example: GENERAL
+
+    SlotStatus:
+      type: string
+      enum: [AVAILABLE, BOOKED, BLOCKED]
+      example: AVAILABLE
+
+    AppointmentStatus:
+      type: string
+      enum: [PENDING, CONFIRMED, CANCELLED, LATE_CANCELLED, COMPLETED]
+      example: CONFIRMED
+
+    WaitingListStatus:
+      type: string
+      enum: [WAITING, OFFERED, ACCEPTED, EXPIRED, CANCELLED]
+      example: WAITING
+
+    NotificationType:
+      type: string
+      enum: [APPOINTMENT_CONFIRMED, APPOINTMENT_MODIFIED, APPOINTMENT_CANCELLED, WAITING_LIST_OFFER]
+
+    NotificationStatus:
+      type: string
+      enum: [UNREAD, READ, FAILED]
+
+    # ── Requests ───────────────────────────────────────────────────────────────
+
+    VetRequest:
+      type: object
+      required: [firstName, lastName, email, clinicName, consultationType]
+      properties:
+        firstName:        { type: string, example: Alice }
+        lastName:         { type: string, example: Dupont }
+        email:            { type: string, format: email, example: alice@clinic.tn }
+        phone:            { type: string, example: "+21671000001" }
+        clinicName:       { type: string, example: Clinique Centrale }
+        address:          { type: string, example: 12 av. Bourguiba }
+        city:             { type: string, example: Tunis }
+        latitude:         { type: number, format: double, example: 36.819 }
+        longitude:        { type: number, format: double, example: 10.165 }
+        consultationType: { $ref: '#/components/schemas/ConsultationType' }
+
+    SlotRequest:
+      type: object
+      required: [startTime, endTime]
+      properties:
+        startTime: { type: string, format: date-time, example: "2026-11-10T09:00:00" }
+        endTime:   { type: string, format: date-time, example: "2026-11-10T09:30:00" }
+
+    AppointmentRequest:
+      type: object
+      required: [slotId, ownerId, consultationType]
+      properties:
+        slotId:           { type: integer, format: int64, example: 42 }
+        ownerId:          { type: integer, format: int64, example: 7 }
+        petId:            { type: integer, format: int64, example: 3 }
+        consultationType: { $ref: '#/components/schemas/ConsultationType' }
+        notes:            { type: string, example: Visite de routine }
+
+    AppointmentModifyRequest:
+      type: object
+      description: |
+        newSlotId optionnel — omis = mise à jour des notes uniquement.
+        Fourni = reschedule sur le nouveau créneau (même vétérinaire obligatoire).
+      properties:
+        newSlotId: { type: integer, format: int64, example: 55 }
+        notes:     { type: string, example: Suivi post-opératoire }
+
+    WaitingListRequest:
+      type: object
+      required: [slotId, ownerId, consultationType]
+      properties:
+        slotId:           { type: integer, format: int64, example: 42 }
+        ownerId:          { type: integer, format: int64, example: 7 }
+        petId:            { type: integer, format: int64, example: 3 }
+        consultationType: { $ref: '#/components/schemas/ConsultationType' }
+
+    # ── Responses ──────────────────────────────────────────────────────────────
+
+    VetResponse:
+      type: object
+      properties:
+        id:               { type: integer, format: int64 }
+        firstName:        { type: string }
+        lastName:         { type: string }
+        email:            { type: string }
+        phone:            { type: string }
+        clinicName:       { type: string }
+        address:          { type: string }
+        city:             { type: string }
+        latitude:         { type: number }
+        longitude:        { type: number }
+        consultationType: { $ref: '#/components/schemas/ConsultationType' }
+        active:           { type: boolean }
+
+    SlotResponse:
+      type: object
+      properties:
+        id:          { type: integer, format: int64 }
+        vetId:       { type: integer, format: int64 }
+        vetFullName: { type: string }
+        startTime:   { type: string, format: date-time }
+        endTime:     { type: string, format: date-time }
+        status:      { $ref: '#/components/schemas/SlotStatus' }
+
+    AppointmentResponse:
+      type: object
+      properties:
+        id:               { type: integer, format: int64 }
+        slotId:           { type: integer, format: int64 }
+        slotStartTime:    { type: string, format: date-time }
+        slotEndTime:      { type: string, format: date-time }
+        vetId:            { type: integer, format: int64 }
+        vetFullName:      { type: string }
+        ownerId:          { type: integer, format: int64 }
+        petId:            { type: integer, format: int64 }
+        consultationType: { $ref: '#/components/schemas/ConsultationType' }
+        status:           { $ref: '#/components/schemas/AppointmentStatus' }
+        notes:            { type: string }
+        createdAt:        { type: string, format: date-time }
+        updatedAt:        { type: string, format: date-time }
+
+    WaitingListResponse:
+      type: object
+      properties:
+        id:               { type: integer, format: int64 }
+        slotId:           { type: integer, format: int64 }
+        slotStartTime:    { type: string, format: date-time }
+        vetId:            { type: integer, format: int64 }
+        vetFullName:      { type: string }
+        ownerId:          { type: integer, format: int64 }
+        petId:            { type: integer, format: int64 }
+        consultationType: { $ref: '#/components/schemas/ConsultationType' }
+        status:           { $ref: '#/components/schemas/WaitingListStatus' }
+        registeredAt:     { type: string, format: date-time }
+        offerExpiresAt:   { type: string, format: date-time, description: "Présent uniquement quand status = OFFERED" }
+
+    NotificationResponse:
+      type: object
+      properties:
+        id:              { type: integer, format: int64 }
+        recipientId:     { type: integer, format: int64 }
+        type:            { $ref: '#/components/schemas/NotificationType' }
+        status:          { $ref: '#/components/schemas/NotificationStatus' }
+        message:         { type: string }
+        referenceId:     { type: integer, format: int64 }
+        createdAt:       { type: string, format: date-time }
+        readAt:          { type: string, format: date-time }
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:  { type: integer, example: 409 }
+        message: { type: string, example: "Slot 42 is already booked." }
+        path:    { type: string, example: "/api/v1/appointments" }
+        errors:  { type: object, description: "Erreurs de validation par champ (HTTP 400 uniquement)" }

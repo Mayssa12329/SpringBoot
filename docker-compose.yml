@@ -278,6 +278,50 @@ services:
     networks:
       - medivet-network
 
+  # ============================================================
+  # MICROSERVICE 7 : VETPHARMA - PHARMACIES & MÉDICAMENTS (Port 8088 / gRPC 9091)
+  # ============================================================
+  vetpharma-db:
+    image: postgres:16-alpine
+    container_name: medivet-vetpharma-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: vetpharma_db
+      POSTGRES_USER: vetpharma_user
+      POSTGRES_PASSWORD: vetpharma_password
+    ports:
+      - "5437:5432"
+    volumes:
+      - vetpharma_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vetpharma_user -d vetpharma_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - medivet-network
+
+  vetpharma-service:
+    build:
+      context: ./vetpharma-service
+      dockerfile: Dockerfile
+    container_name: vetpharma-service
+    restart: unless-stopped
+    ports:
+      - "8088:8088"
+      - "9091:9091"
+    environment:
+      SERVER_PORT: 8088
+      SPRING_DATASOURCE_URL: jdbc:postgresql://vetpharma-db:5432/vetpharma_db
+      SPRING_DATASOURCE_USERNAME: vetpharma_user
+      SPRING_DATASOURCE_PASSWORD: vetpharma_password
+      GRPC_PORT: 9091
+    depends_on:
+      vetpharma-db:
+        condition: service_healthy
+    networks:
+      - medivet-network
+
 networks:
   medivet-network:
     driver: bridge
@@ -290,3 +334,4 @@ volumes:
   helpanimal_photos:
   adoptanimal_db_data:
   vetinterop_db_data:
+  vetpharma_db_data:

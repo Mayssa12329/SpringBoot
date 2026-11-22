@@ -20,9 +20,13 @@ public class StockService {
 
     // ── Lecture ───────────────────────────────────────────────────────────
 
+    /**
+     * VerifierStock : lecture simple sans verrou (readOnly = true).
+     * Le verrou pessimiste n'est nécessaire que pour les opérations d'écriture.
+     */
     @Transactional(readOnly = true)
     public Stock verifier(Long produitId, Long pharmacieId) {
-        return repo.findByProduitAndPharmacieForUpdate(produitId, pharmacieId)
+        return repo.findByProduitAndPharmacie(produitId, pharmacieId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Stock introuvable pour produit=" + produitId
                         + " pharmacie=" + pharmacieId));

@@ -14,11 +14,12 @@ public interface ProduitRepository extends JpaRepository<Produit, Long> {
 
     /**
      * US35 : recherche par mot-clé dans le nom (contains, insensible à la casse).
-     * Si {@code categorie} est vide la contrainte est ignorée.
+     * Utilise une native query pour éviter l'ambiguïté de type null avec LOWER() en JPQL.
      */
-    @Query("SELECT p FROM Produit p " +
-           "WHERE (:motCle IS NULL OR LOWER(p.nom) LIKE LOWER(CONCAT('%', :motCle, '%'))) " +
-           "AND   (:categorie IS NULL OR LOWER(p.categorie) = LOWER(:categorie))")
+    @Query(value = "SELECT * FROM produit p " +
+                   "WHERE (:motCle IS NULL OR LOWER(p.nom) LIKE LOWER(CONCAT('%', CAST(:motCle AS text), '%'))) " +
+                   "AND   (:categorie IS NULL OR LOWER(p.categorie) = LOWER(CAST(:categorie AS text)))",
+           nativeQuery = true)
     List<Produit> rechercherParMotCleEtCategorie(@Param("motCle")    String motCle,
                                                  @Param("categorie") String categorie);
 }

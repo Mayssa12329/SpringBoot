@@ -18,8 +18,16 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     Optional<Stock> findByProduitAndPharmacieForUpdate(@Param("produitId")   Long produitId,
                                                        @Param("pharmacieId") Long pharmacieId);
 
+    /** Recherche simple sans verrou (lecture seule). */
+    @Query("SELECT s FROM Stock s WHERE s.produit.produitId = :produitId AND s.pharmacie.pharmacieId = :pharmacieId")
+    Optional<Stock> findByProduitAndPharmacie(@Param("produitId")   Long produitId,
+                                              @Param("pharmacieId") Long pharmacieId);
+
     @Query("SELECT s FROM Stock s WHERE s.pharmacie.pharmacieId = :pharmacieId")
     List<Stock> findByPharmacieId(@Param("pharmacieId") Long pharmacieId);
 
     List<Stock> findAll();
+
+    @Query("SELECT s FROM Stock s WHERE s.produit.produitId = :produitId")
+    List<Stock> findByProduitId(@Param("produitId") Long produitId);
 }

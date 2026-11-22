@@ -20,19 +20,21 @@ public final class GlobalExceptionHandler {
     private GlobalExceptionHandler() {}
 
     public static Status toGrpcStatus(Exception ex) {
-        return switch (ex) {
-            case ResourceNotFoundException e ->
-                    Status.NOT_FOUND.withDescription(e.getMessage());
-            case StockIndisponibleException e ->
-                    Status.FAILED_PRECONDITION.withDescription(e.getMessage());
-            case ReservationExpireeException e ->
-                    Status.FAILED_PRECONDITION.withDescription(e.getMessage());
-            case IllegalStateException e ->
-                    Status.FAILED_PRECONDITION.withDescription(e.getMessage());
-            case IllegalArgumentException e ->
-                    Status.INVALID_ARGUMENT.withDescription(e.getMessage());
-            default ->
-                    Status.INTERNAL.withDescription("Erreur interne : " + ex.getMessage());
-        };
+        if (ex instanceof ResourceNotFoundException e) {
+            return Status.NOT_FOUND.withDescription(e.getMessage());
+        }
+        if (ex instanceof StockIndisponibleException e) {
+            return Status.FAILED_PRECONDITION.withDescription(e.getMessage());
+        }
+        if (ex instanceof ReservationExpireeException e) {
+            return Status.FAILED_PRECONDITION.withDescription(e.getMessage());
+        }
+        if (ex instanceof IllegalStateException e) {
+            return Status.FAILED_PRECONDITION.withDescription(e.getMessage());
+        }
+        if (ex instanceof IllegalArgumentException e) {
+            return Status.INVALID_ARGUMENT.withDescription(e.getMessage());
+        }
+        return Status.INTERNAL.withDescription("Erreur interne : " + ex.getMessage());
     }
 }

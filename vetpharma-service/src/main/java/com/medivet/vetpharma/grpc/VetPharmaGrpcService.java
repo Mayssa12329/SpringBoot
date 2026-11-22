@@ -14,6 +14,8 @@ import net.devh.boot.grpc.server.service.GrpcService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.List;
+
 /**
  * Implémentation de tous les RPCs <b>unaires</b> de VetPharmaService.
  *
@@ -27,7 +29,7 @@ import org.slf4j.LoggerFactory;
  *   <li>US38 – ConfirmerReservation</li>
  * </ul>
  *
- * Le RPC streaming {@code SuivreStocks} est dans {@link VetPharmaStreamService}.
+ * Le RPC streaming {@code SuivreStocks} est également implémenté ici.
  */
 @GrpcService
 public class VetPharmaGrpcService extends VetPharmaServiceGrpc.VetPharmaServiceImplBase {
@@ -243,6 +245,34 @@ public class VetPharmaGrpcService extends VetPharmaServiceGrpc.VetPharmaServiceI
             obs.onCompleted();
         } catch (Exception e) {
             handleError("confirmerReservation", e, obs);
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════
+    //  Streaming serveur – SuivreStocks
+    // ══════════════════════════════════════════════════════════════════════
+
+    /**
+     * RPC streaming serveur : envoie l'état courant de tous les stocks
+     * de la pharmacie demandée (ou de toutes si {@code pharmacieId == 0}),
+     * puis ferme le flux.
+     */
+    @Override
+    public void suivreStocks(SuivreStocksRequest req,
+                             StreamObserver<StockResponse> obs) {
+        try {
+            List<Stock> stocks = req.getPharmacieId() == 0
+                    ? stockService.listerTous()
+                    : stockService.listerParPharmacie(req.getPharmacieId());
+
+            for (Stock s : stocks) {
+                obs.onNext(toStockResponse(s));
+            }
+            obs.onCompleted();
+            log.debug("suivreStocks : {} stock(s) envoyé(s) pour pharmacieId={}",
+                      stocks.size(), req.getPharmacieId());
+        } catch (Exception e) {
+            handleError("suivreStocks", e, obs);
         }
     }
 

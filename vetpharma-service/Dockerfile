@@ -12,7 +12,7 @@ RUN mvn -B dependency:go-offline
 
 # Copie les sources et compile (les stubs gRPC sont générés ici)
 COPY src ./src
-RUN mvn -B clean package -DskipTests
+RUN mvn -B clean package -Dmaven.test.skip=true
 
 # ── Étape 2 : image d'exécution légère ───────────────────────
 FROM eclipse-temurin:17-jre

@@ -36,3 +36,8 @@ build/
 ### Logs ###
 *.log
 
+medivet-frontend/node_modules/
+
+### Frontend build artifacts ###
+medivet-frontend/.angular/
+medivet-frontend/dist/

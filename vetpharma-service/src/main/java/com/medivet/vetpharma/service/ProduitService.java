@@ -3,6 +3,7 @@ package com.medivet.vetpharma.service;
 import com.medivet.vetpharma.entity.Produit;
 import com.medivet.vetpharma.exception.ResourceNotFoundException;
 import com.medivet.vetpharma.repository.ProduitRepository;
+import com.medivet.vetpharma.repository.StockRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,9 +14,11 @@ import java.util.List;
 public class ProduitService {
 
     private final ProduitRepository repo;
+    private final StockRepository   stockRepo;
 
-    public ProduitService(ProduitRepository repo) {
-        this.repo = repo;
+    public ProduitService(ProduitRepository repo, StockRepository stockRepo) {
+        this.repo      = repo;
+        this.stockRepo = stockRepo;
     }
 
     // ── Lecture ───────────────────────────────────────────────────────────
@@ -63,6 +66,8 @@ public class ProduitService {
     @Transactional
     public void supprimer(Long id) {
         Produit p = obtenirParId(id);
+        // Supprimer d'abord les stocks liés (contrainte FK stock_produit_id_fkey)
+        stockRepo.deleteAll(stockRepo.findByProduitId(id));
         repo.delete(p);
     }
 
