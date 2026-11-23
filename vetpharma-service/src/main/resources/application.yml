@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: ${SERVICE_NAME:vetpharma-service}
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://vetpharma-db:5432/vetpharma_db}
+    username: ${SPRING_DATASOURCE_USERNAME:vetpharma_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:vetpharma_password}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate        # schéma géré par Flyway
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+
+# ── gRPC server ──────────────────────────────────────────────────────
+grpc:
+  server:
+    port: ${GRPC_PORT:9091}
+
+# ── Actuator ─────────────────────────────────────────────────────────
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
