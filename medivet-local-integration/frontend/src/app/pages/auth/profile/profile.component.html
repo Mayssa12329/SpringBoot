@@ -1,0 +1,400 @@
+<div class="profile-page-container">
+  <!-- Toast alert notification -->
+  @if (alertMessage) {
+    <div class="profile-alert" [class.success]="alertType === 'success'" [class.error]="alertType === 'error'" [class.info]="alertType === 'info'">
+      <span>{{ alertMessage }}</span>
+      <button class="alert-close-btn" (click)="clearAlert()">×</button>
+    </div>
+  }
+
+  <!-- 2. HERO BANNER: MON PROFIL -->
+  <section class="profile-hero-banner">
+    <!-- Background Decor (Waves & Paws) -->
+    <div class="banner-decor-bg" aria-hidden="true">
+      <img src="assets/images/profile-banner-bg.webp" alt="Background waves and paws" class="banner-bg-img" />
+    </div>
+
+    <!-- Left Content -->
+    <div class="banner-left-content">
+      <div class="banner-title-row">
+        <h1 class="banner-title">Mon profil</h1>
+        <!-- Green heart outline -->
+        <svg class="banner-heart-icon" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+        </svg>
+      </div>
+      <p class="banner-subtitle">Gérez vos informations et sécurisez votre compte</p>
+
+      <button type="button" class="btn-back-dashboard" (click)="goToDashboard()">
+        <span>Retour au tableau de bord</span>
+        <svg class="arrow-right-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="5" y1="12" x2="19" y2="12"></line>
+          <polyline points="12 5 19 12 12 19"></polyline>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Right Content: Cursive text -->
+    <div class="banner-right-content">
+      <div class="slogan-cursive">
+        <span>Together</span>
+        <span>for a kinder world</span>
+      </div>
+    </div>
+
+    <!-- Pets Cutout anchored to the bottom of the banner -->
+    <div class="banner-pets-wrapper">
+      <img 
+        src="assets/images/profile-pets.png" 
+        alt="Cat and Golden Retriever" 
+        class="banner-pets-cutout" 
+      />
+    </div>
+  </section>
+
+  <!-- 3. MAIN GRID: 2 COLUMNS TOP ROW -->
+  <div class="profile-grid-top">
+    <!-- Card 1: Modifier mes informations -->
+    <div class="profile-card info-card">
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="icon-circle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+          </div>
+          <h3>Modifier mes informations</h3>
+        </div>
+
+        <button type="button" class="btn-enregistrer-pill" (click)="onSaveProfile()" [disabled]="isSaving">
+          <svg class="edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          <span>{{ isSaving ? 'Enregistrement...' : 'Enregistrer' }}</span>
+        </button>
+      </div>
+
+      <div class="info-card-body">
+        <!-- Avatar on left -->
+        <div class="avatar-col">
+          <div class="avatar-ring-wrap">
+            <img [src]="avatarUrl" alt="Avatar" class="profile-large-avatar" />
+            <button type="button" class="btn-avatar-camera" (click)="fileInput.click()" title="Modifier la photo">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+              </svg>
+            </button>
+            <input #fileInput type="file" (change)="onAvatarSelected($event)" accept="image/*" style="display: none;" />
+          </div>
+        </div>
+
+        <!-- Form fields on right -->
+        <div class="fields-col">
+          <div class="form-field">
+            <label class="field-label">Nom complet</label>
+            <div class="field-input-wrap">
+              <svg class="field-icon user-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+              <input type="text" [(ngModel)]="nomComplet" class="field-input" placeholder="Votre nom complet" />
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label class="field-label">Email</label>
+            <div class="field-input-wrap">
+              <svg class="field-icon mail-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                <polyline points="22,6 12,13 2,6"></polyline>
+              </svg>
+              <input type="email" [(ngModel)]="userEmail" class="field-input" placeholder="votre@email.com" />
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label class="field-label">Téléphone</label>
+            <div class="field-input-wrap">
+              <svg class="field-icon phone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
+              </svg>
+              <input type="text" [(ngModel)]="editTelephone" class="field-input" placeholder="+216 XX XXX XXX" />
+            </div>
+          </div>
+
+          <div class="form-field">
+            <label class="field-label">Adresse</label>
+            <div class="field-input-wrap">
+              <svg class="field-icon pin-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+              </svg>
+              <input type="text" [(ngModel)]="editAdresse" class="field-input" placeholder="Ville, Pays" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Card 2: Changer mot de passe -->
+    <div class="profile-card password-card">
+      <!-- Shield watermark in top right -->
+      <div class="shield-watermark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="1.8" opacity="0.35">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          <rect x="9" y="11" width="6" height="5" rx="1" fill="#10b981"></rect>
+          <path d="M10 11V9a2 2 0 0 1 4 0v2"></path>
+        </svg>
+      </div>
+
+      <div class="card-header">
+        <div class="card-header-left">
+          <div class="icon-circle">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+          </div>
+          <h3>Changer mot de passe</h3>
+        </div>
+      </div>
+
+      <div class="password-card-body">
+        <div class="form-field">
+          <label class="field-label">Mot de passe actuel</label>
+          <div class="field-input-wrap">
+            <svg class="field-icon lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            <input 
+              [type]="showCurrentPassword ? 'text' : 'password'" 
+              [(ngModel)]="currentPassword" 
+              class="field-input" 
+              placeholder="Entrez votre mot de passe actuel" 
+            />
+            <button type="button" class="btn-toggle-eye" (click)="showCurrentPassword = !showCurrentPassword">
+              <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                @if (showCurrentPassword) {
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                } @else {
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                  <line x1="1" y1="1" x2="23" y2="23"></line>
+                }
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label class="field-label">Nouveau mot de passe</label>
+          <div class="field-input-wrap">
+            <svg class="field-icon lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            <input 
+              [type]="showNewPassword ? 'text' : 'password'" 
+              [(ngModel)]="newPassword" 
+              class="field-input" 
+              placeholder="Entrez votre nouveau mot de passe" 
+            />
+            <button type="button" class="btn-toggle-eye" (click)="showNewPassword = !showNewPassword">
+              <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                @if (showNewPassword) {
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                } @else {
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                  <line x1="1" y1="1" x2="23" y2="23"></line>
+                }
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label class="field-label">Confirmer le mot de passe</label>
+          <div class="field-input-wrap">
+            <svg class="field-icon lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            <input 
+              [type]="showConfirmPassword ? 'text' : 'password'" 
+              [(ngModel)]="confirmPassword" 
+              class="field-input" 
+              placeholder="Confirmez votre mot de passe" 
+            />
+            <button type="button" class="btn-toggle-eye" (click)="showConfirmPassword = !showConfirmPassword">
+              <svg class="eye-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                @if (showConfirmPassword) {
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                } @else {
+                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                  <line x1="1" y1="1" x2="23" y2="23"></line>
+                }
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <button type="button" class="btn-submit-pwd" (click)="onChangePassword()" [disabled]="isChangingPassword">
+          <svg class="btn-lock-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+          <span>{{ isChangingPassword ? 'Mise à jour...' : 'Mettre à jour le mot de passe' }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. BOTTOM CARD (FULL WIDTH): PRÉFÉRENCES & NOTIFICATIONS -->
+  <div class="profile-card preferences-card">
+    <div class="card-header">
+      <div class="card-header-left">
+        <div class="icon-circle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+          </svg>
+        </div>
+        <h3>Préférences & notifications</h3>
+      </div>
+    </div>
+
+    <div class="preferences-grid">
+      <!-- Left Column: Notifications que je souhaite recevoir -->
+      <div class="pref-col">
+        <h4 class="pref-section-title">Notifications que je souhaite recevoir</h4>
+
+        <div class="toggle-row">
+          <div class="toggle-label-wrap">
+            <svg class="pref-icon paw-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 11c-1.8 0-3.3 1.5-3.3 3.8 0 2.3 1.5 4.2 3.3 4.2s3.3-1.9 3.3-4.2c0-2.3-1.5-3.8-3.3-3.8zM7 9.5C5.9 9.5 5 10.4 5 11.5S5.9 13.5 7 13.5s2-.9 2-2S8.1 9.5 7 9.5zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM4.5 14C3.7 14 3 14.7 3 15.5S3.7 17 4.5 17 6 16.3 6 15.5 5.3 14 4.5 14zm15 0c-.8 0-1.5.7-1.5 1.5s.7 1.5 1.5 1.5 1.5-.7 1.5-1.5-.7-1.5-1.5-1.5z"/>
+            </svg>
+            <span class="toggle-text">Rappels de rendez-vous</span>
+          </div>
+          <button 
+            type="button" 
+            class="switch-toggle" 
+            [class.active]="notifRappelsRdv" 
+            (click)="notifRappelsRdv = !notifRappelsRdv"
+            aria-label="Toggle Rappels de rendez-vous"
+          >
+            <span class="switch-handle"></span>
+          </button>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-label-wrap">
+            <svg class="pref-icon calendar-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <span class="toggle-text">Alertes santé</span>
+          </div>
+          <button 
+            type="button" 
+            class="switch-toggle" 
+            [class.active]="notifAlertesSante" 
+            (click)="notifAlertesSante = !notifAlertesSante"
+            aria-label="Toggle Alertes santé"
+          >
+            <span class="switch-handle"></span>
+          </button>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-label-wrap">
+            <svg class="pref-icon megaphone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 11l18-5v12L3 14v-3z"></path>
+              <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"></path>
+            </svg>
+            <span class="toggle-text">Nouvelles et conseils</span>
+          </div>
+          <button 
+            type="button" 
+            class="switch-toggle" 
+            [class.active]="notifNouvellesConseils" 
+            (click)="notifNouvellesConseils = !notifNouvellesConseils"
+            aria-label="Toggle Nouvelles et conseils"
+          >
+            <span class="switch-handle"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Vertical Divider -->
+      <div class="pref-vertical-divider" aria-hidden="true"></div>
+
+      <!-- Right Column: Préférences générales -->
+      <div class="pref-col">
+        <h4 class="pref-section-title">Préférences générales</h4>
+
+        <div class="toggle-row">
+          <div class="toggle-label-wrap">
+            <svg class="pref-icon paw-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 11c-1.8 0-3.3 1.5-3.3 3.8 0 2.3 1.5 4.2 3.3 4.2s3.3-1.9 3.3-4.2c0-2.3-1.5-3.8-3.3-3.8zM7 9.5C5.9 9.5 5 10.4 5 11.5S5.9 13.5 7 13.5s2-.9 2-2S8.1 9.5 7 9.5zm10 0c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM4.5 14C3.7 14 3 14.7 3 15.5S3.7 17 4.5 17 6 16.3 6 15.5 5.3 14 4.5 14zm15 0c-.8 0-1.5.7-1.5 1.5s.7 1.5 1.5 1.5 1.5-.7 1.5-1.5-.7-1.5-1.5-1.5z"/>
+            </svg>
+            <span class="toggle-text">Recevoir des recommandations personnalisées</span>
+          </div>
+          <button 
+            type="button" 
+            class="switch-toggle" 
+            [class.active]="prefRecommandations" 
+            (click)="prefRecommandations = !prefRecommandations"
+            aria-label="Toggle Recommandations personnalisées"
+          >
+            <span class="switch-handle"></span>
+          </button>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-label-wrap">
+            <svg class="pref-icon heart-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+            </svg>
+            <span class="toggle-text">Recevoir des offres d'adoption</span>
+          </div>
+          <button 
+            type="button" 
+            class="switch-toggle" 
+            [class.active]="prefOffresAdoption" 
+            (click)="prefOffresAdoption = !prefOffresAdoption"
+            aria-label="Toggle Offres d'adoption"
+          >
+            <span class="switch-handle"></span>
+          </button>
+        </div>
+
+        <div class="toggle-row">
+          <div class="toggle-label-wrap">
+            <svg class="pref-icon mail-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+              <polyline points="22,6 12,13 2,6"></polyline>
+            </svg>
+            <span class="toggle-text">Recevoir des newsletters</span>
+          </div>
+          <button 
+            type="button" 
+            class="switch-toggle" 
+            [class.active]="prefNewsletters" 
+            (click)="prefNewsletters = !prefNewsletters"
+            aria-label="Toggle Newsletters"
+          >
+            <span class="switch-handle"></span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
