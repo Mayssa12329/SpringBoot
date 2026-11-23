@@ -1,0 +1,410 @@
+openapi: 3.0.3
+info:
+  title: MediVet Connect — Microservice VetBooking API
+  description: |
+    Contrat d'API REST formel pour le microservice **VetBooking**.
+    Gère le référentiel des praticiens vétérinaires (US13), la création et consultation des créneaux (US14),
+    la réservation avec verrou d'unicité (US15 / RM06 / RM07) et la file d'attente FIFO (US16 / RM08).
+  version: 1.0.0
+  contact:
+    name: Équipe MediVet Connect
+    email: contact@medivet.com
+
+servers:
+  - url: http://localhost:8083
+    description: Microservice VetBooking (Port 8083)
+
+tags:
+  - name: Vétérinaires & Créneaux
+    description: Gestion des praticiens, spécialités médicales et plannings
+  - name: Rendez-vous & File d'attente
+    description: Prise de rendez-vous, clôture de consultations et liste d'attente prioritaire FIFO
+
+paths:
+  /api/v1/vets:
+    post:
+      tags:
+        - Vétérinaires & Créneaux
+      summary: Enregistrer un praticien vétérinaire (US13)
+      operationId: registerVet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VetRequest'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VetResponse'
+        '409':
+          description: Email du vétérinaire déjà existant
+    get:
+      tags:
+        - Vétérinaires & Créneaux
+      summary: Rechercher des vétérinaires par ville et spécialité (RM07)
+      operationId: searchVets
+      parameters:
+        - name: city
+          in: query
+          schema:
+            type: string
+        - name: consultationType
+          in: query
+          schema:
+            type: string
+            enum: [GENERAL, SURGERY, DERMATOLOGY, CARDIOLOGY, ORTHOPEDICS, OPHTHALMOLOGY, DENTISTRY, EMERGENCY]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/VetResponse'
+
+  /api/v1/vets/{vetId}/slots:
+    post:
+      tags:
+        - Vétérinaires & Créneaux
+      summary: Créer un créneau de consultation de 30 min (US14)
+      operationId: createSlot
+      parameters:
+        - name: vetId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SlotRequest'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SlotResponse'
+    get:
+      tags:
+        - Vétérinaires & Créneaux
+      summary: Obtenir les créneaux disponibles d'un praticien (US14)
+      operationId: getSlots
+      parameters:
+        - name: vetId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+            default: AVAILABLE
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SlotResponse'
+
+  /api/v1/appointments:
+    post:
+      tags:
+        - Rendez-vous & File d'attente
+      summary: Réserver un rendez-vous (US15 / RM06 / RM07 / RM09)
+      description: Bloque le créneau de manière unique, valide la spécialité et accorde automatiquement l'accès PetPass
+      operationId: bookAppointment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentRequest'
+      responses:
+        '201':
+          description: Rendez-vous confirmé
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentResponse'
+        '409':
+          description: Conflit — Créneau déjà réservé (Règle RM06)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: Incompatibilité de spécialité (Règle RM07)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/appointments/{id}/status:
+    patch:
+      tags:
+        - Rendez-vous & File d'attente
+      summary: Mettre à jour le statut du RDV (US50 / VetFlow)
+      description: Clôture la consultation (COMPLETED) et génère la fiche médicale dans PetPass
+      operationId: updateAppointmentStatus
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: status
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [CONFIRMED, CANCELLED, COMPLETED, NO_SHOW]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppointmentResponse'
+
+  /api/v1/waiting-list:
+    post:
+      tags:
+        - Rendez-vous & File d'attente
+      summary: S'inscrire sur la file d'attente FIFO (US16 / RM08)
+      description: Priorité exclusive de 30 minutes si un créneau se libère
+      operationId: joinWaitingList
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WaitingListRequest'
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WaitingListResponse'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: "Bad Request"
+        message:
+          type: string
+          example: "Validation des données échouée"
+        path:
+          type: string
+          example: "/api/v1/appointments"
+        timestamp:
+          type: string
+          format: date-time
+          example: "2026-11-17T14:00:00"
+
+    VetRequest:
+      type: object
+      required:
+        - firstName
+        - lastName
+        - email
+        - clinicName
+        - consultationType
+      properties:
+        firstName:
+          type: string
+          example: "Sarah"
+        lastName:
+          type: string
+          example: "Martin"
+        email:
+          type: string
+          format: email
+          example: "sarah.martin@medivet.com"
+        phone:
+          type: string
+          example: "+33140506070"
+        clinicName:
+          type: string
+          example: "Clinique Vétérinaire des Lilas"
+        address:
+          type: string
+          example: "12 Rue de Paris"
+        city:
+          type: string
+          example: "Paris"
+        latitude:
+          type: number
+          example: 48.8566
+        longitude:
+          type: number
+          example: 2.3522
+        consultationType:
+          type: string
+          enum: [GENERAL, SURGERY, DERMATOLOGY, CARDIOLOGY, ORTHOPEDICS, OPHTHALMOLOGY, DENTISTRY, EMERGENCY]
+          example: "GENERAL"
+
+    VetResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        clinicName:
+          type: string
+        city:
+          type: string
+        consultationType:
+          type: string
+        active:
+          type: boolean
+
+    SlotRequest:
+      type: object
+      required:
+        - startTime
+        - endTime
+      properties:
+        startTime:
+          type: string
+          format: date-time
+          example: "2026-11-20T09:00:00"
+        endTime:
+          type: string
+          format: date-time
+          example: "2026-11-20T09:30:00"
+
+    SlotResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        vetId:
+          type: integer
+        startTime:
+          type: string
+          format: date-time
+        endTime:
+          type: string
+          format: date-time
+        status:
+          type: string
+          example: "AVAILABLE"
+
+    AppointmentRequest:
+      type: object
+      required:
+        - slotId
+        - ownerId
+        - petId
+        - consultationType
+      properties:
+        slotId:
+          type: integer
+          example: 10
+        ownerId:
+          type: integer
+          example: 1
+        petId:
+          type: integer
+          example: 1
+        consultationType:
+          type: string
+          enum: [GENERAL, SURGERY, DERMATOLOGY, CARDIOLOGY, ORTHOPEDICS, OPHTHALMOLOGY, DENTISTRY, EMERGENCY]
+          example: "GENERAL"
+        notes:
+          type: string
+          example: "Visite de contrôle annuelle"
+
+    AppointmentResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 42
+        slotId:
+          type: integer
+        ownerId:
+          type: integer
+        petId:
+          type: integer
+        consultationType:
+          type: string
+        status:
+          type: string
+          example: "CONFIRMED"
+        notes:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    WaitingListRequest:
+      type: object
+      required:
+        - vetId
+        - ownerId
+        - petId
+        - consultationType
+        - desiredDate
+      properties:
+        vetId:
+          type: integer
+          example: 1
+        ownerId:
+          type: integer
+          example: 1
+        petId:
+          type: integer
+          example: 1
+        consultationType:
+          type: string
+          example: "GENERAL"
+        desiredDate:
+          type: string
+          format: date
+          example: "2026-11-20"
+
+    WaitingListResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+        vetId:
+          type: integer
+        ownerId:
+          type: integer
+        petId:
+          type: integer
+        status:
+          type: string
+          example: "WAITING"
+        createdAt:
+          type: string
+          format: date-time

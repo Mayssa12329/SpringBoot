@@ -1,0 +1,846 @@
+{
+	"info": {
+		"_postman_id": "c1f24d77-9831-4a34-b258-petpass-vetbooking",
+		"name": "MediVet - PetPass & VetBooking Integration (T29)",
+		"description": "Collection de tests de bout en bout pour PetPassService, VetBookingService et leurs communications inter-services (Scénario SC4 + VetFlow E09).",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8081",
+			"type": "string"
+		},
+		{
+			"key": "jwtToken",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "ownerId",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "petId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "vetId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "slotId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "appointmentId",
+			"value": "",
+			"type": "string"
+		}
+	],
+	"item": [
+		{
+			"name": "1. PetPass - Créer un animal (US07)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 or 201\", function () {",
+							"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+							"});",
+							"var jsonData = pm.response.json();",
+							"pm.collectionVariables.set(\"petId\", jsonData.id);",
+							"console.log(\"Animal créé avec ID: \" + jsonData.id);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"Rex\",\n  \"species\": \"CHIEN\",\n  \"breed\": \"Berger Allemand\",\n  \"birthDate\": \"2022-05-10\",\n  \"gender\": \"M\",\n  \"weight\": 28.5,\n  \"microchipId\": \"250269600123456\",\n  \"ownerId\": 7,\n  \"description\": \"Chien en bonne santé\",\n  \"isSterilized\": true,\n  \"vaccinationStatus\": \"A_JOUR\",\n  \"healthStatus\": \"BON\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/animals",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"animals"
+					]
+				}
+			}
+		},
+		{
+			"name": "2. VetBooking - Enregistrer un vétérinaire (US13)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 201 Created\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"var jsonData = pm.response.json();",
+							"pm.collectionVariables.set(\"vetId\", jsonData.id);",
+							"console.log(\"Vétérinaire créé avec ID: \" + jsonData.id);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"firstName\": \"Sarah\",\n  \"lastName\": \"Ben Ali\",\n  \"email\": \"dr.sarah.benali@medivet.tn\",\n  \"phone\": \"+21620000111\",\n  \"clinicName\": \"Clinique Vétérinaire Tunis\",\n  \"address\": \"15 Avenue Habib Bourguiba\",\n  \"city\": \"Tunis\",\n  \"latitude\": 36.8065,\n  \"longitude\": 10.1815,\n  \"consultationType\": \"GENERAL\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/vets",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"vets"
+					]
+				}
+			}
+		},
+		{
+			"name": "3. VetBooking - Créer un créneau disponible (US14)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 201 Created\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"var jsonData = pm.response.json();",
+							"pm.collectionVariables.set(\"slotId\", jsonData.id);",
+							"console.log(\"Créneau créé avec ID: \" + jsonData.id);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"startTime\": \"2026-12-01T10:00:00\",\n  \"endTime\": \"2026-12-01T10:30:00\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/vets/{{vetId}}/slots",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"vets",
+						"{{vetId}}",
+						"slots"
+					]
+				}
+			}
+		},
+		{
+			"name": "4. Inter-Services - Réserver RDV lié à l'animal (US15 + RM06 + RM09)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 201 Created\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"var jsonData = pm.response.json();",
+							"pm.collectionVariables.set(\"appointmentId\", jsonData.id);",
+							"pm.expect(jsonData.status).to.eql(\"CONFIRMED\");",
+							"pm.expect(jsonData.petId).to.eql(Number(pm.collectionVariables.get(\"petId\")));"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"slotId\": {{slotId}},\n  \"ownerId\": 7,\n  \"petId\": {{petId}},\n  \"consultationType\": \"GENERAL\",\n  \"notes\": \"Bilan annuel et consultation de routine\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/appointments",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"appointments"
+					]
+				}
+			}
+		},
+		{
+			"name": "5. Règle Métier RM06 - Tenter double réservation (Conflit 409)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 409 Conflict (RM06 respectée)\", function () {",
+							"    pm.response.to.have.status(409);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"slotId\": {{slotId}},\n  \"ownerId\": 99,\n  \"petId\": {{petId}},\n  \"consultationType\": \"GENERAL\",\n  \"notes\": \"Deuxième réservation concurrente\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/appointments",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"appointments"
+					]
+				}
+			}
+		},
+		{
+			"name": "6. Vérification PetPass - Autorisation auto accordée au vétérinaire (US12 / RM09)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"var auths = pm.response.json();",
+							"pm.test(\"Vétérinaire bien autorisé dans PetPass\", function () {",
+							"    pm.expect(auths.length).to.be.at.least(1);",
+							"    var authorizedVetId = auths[auths.length - 1].veterinarianId;",
+							"    pm.expect(authorizedVetId).to.eql(Number(pm.collectionVariables.get(\"vetId\")));",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/animals/{{petId}}/authorizations",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"animals",
+						"{{petId}}",
+						"authorizations"
+					]
+				}
+			}
+		},
+		{
+			"name": "7. Clôture Consultation - Marquer RDV complété (US50 / VetFlow)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"var jsonData = pm.response.json();",
+							"pm.expect(jsonData.status).to.eql(\"COMPLETED\");"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PATCH",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/appointments/{{appointmentId}}/complete",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"appointments",
+						"{{appointmentId}}",
+						"complete"
+					]
+				}
+			}
+		},
+		{
+			"name": "8. Vérification PetPass - Dossier Médical créé automatiquement (US09)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"var records = pm.response.json();",
+							"pm.test(\"Dossier médical contient la consultation de VetBooking\", function () {",
+							"    pm.expect(records.length).to.be.at.least(1);",
+							"    var last = records[records.length - 1];",
+							"    pm.expect(last.diagnosis).to.include(\"GENERAL\");",
+							"    console.log(\"Dossier médical enregistré: \", last.diagnosis);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/animals/{{petId}}/medical-records",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"animals",
+						"{{petId}}",
+						"medical-records"
+					]
+				}
+			}
+		},
+		{
+			"name": "9. PetPass - Test 400 Bad Request (Validation échouée)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 400 Bad Request\", function () {",
+							"    pm.response.to.have.status(400);",
+							"});",
+							"var error = pm.response.json();",
+							"pm.test(\"Validation details sont présents\", function () {",
+							"    pm.expect(error.status).to.eql(400);",
+							"    pm.expect(error.details).to.exist;",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"\",\n  \"species\": \"\",\n  \"weight\": -10.0\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/animals",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"animals"
+					]
+				}
+			}
+		},
+		{
+			"name": "10. PetPass - Test 409 Conflict (Numéro de puce dupliqué)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 409 Conflict\", function () {",
+							"    pm.response.to.have.status(409);",
+							"});",
+							"var error = pm.response.json();",
+							"pm.test(\"Message de doublon clair\", function () {",
+							"    pm.expect(error.status).to.eql(409);",
+							"    pm.expect(error.message).to.include(\"existe déjà\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"name\": \"Max\",\n  \"species\": \"CHIEN\",\n  \"ownerId\": 7,\n  \"microchipId\": \"250269600123456\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/animals",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"animals"
+					]
+				}
+			}
+		},
+		{
+			"name": "11. PetPass - Test 404 Not Found (Animal inexistant)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 404 Not Found\", function () {",
+							"    pm.response.to.have.status(404);",
+							"});",
+							"var error = pm.response.json();",
+							"pm.test(\"Message d'erreur 404 présent\", function () {",
+							"    pm.expect(error.status).to.eql(404);",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/animals/99999",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"animals",
+						"99999"
+					]
+				}
+			}
+		},
+		{
+			"name": "12. PetPass - Ajouter une Vaccination (US10)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 201 Created\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"var jsonData = pm.response.json();",
+							"pm.expect(jsonData.id).to.exist;",
+							"pm.expect(jsonData.vaccineName).to.include(\"Rage\");"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"vaccineName\": \"Vaccin Antirabique (Rage)\",\n  \"dateAdministered\": \"2026-11-15\",\n  \"nextDueDate\": \"2027-11-15\",\n  \"batchNumber\": \"RAB-2026-8841\",\n  \"veterinarianName\": \"Dr. Martin Dupont\",\n  \"status\": \"À jour\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/animals/{{petId}}/vaccinations",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"animals",
+						"{{petId}}",
+						"vaccinations"
+					]
+				}
+			}
+		},
+		{
+			"name": "13. PetPass - Consulter le Carnet de Vaccins (US10)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"var vaccines = pm.response.json();",
+							"pm.expect(vaccines.length).to.be.at.least(1);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/animals/{{petId}}/vaccinations",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"animals",
+						"{{petId}}",
+						"vaccinations"
+					]
+				}
+			}
+		},
+		{
+			"name": "14. PetPass - Prescrire un Médicament (US09)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 201 Created\", function () {",
+							"    pm.response.to.have.status(201);",
+							"});",
+							"var jsonData = pm.response.json();",
+							"pm.expect(jsonData.id).to.exist;",
+							"pm.expect(jsonData.medicationName).to.include(\"Amoxicilline\");"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"medicationName\": \"Amoxicilline 250mg\",\n  \"dosage\": \"1 comprimé matin et soir pendant 8 jours\",\n  \"startDate\": \"2026-11-15\",\n  \"nextDoseDate\": \"2026-11-16\",\n  \"status\": \"En cours\",\n  \"veterinarianName\": \"Dr. Martin Dupont\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/animals/{{petId}}/medications",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"animals",
+						"{{petId}}",
+						"medications"
+					]
+				}
+			}
+		},
+		{
+			"name": "15. PetPass - Modifier le profil animal (PUT)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 OK\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"var jsonData = pm.response.json();",
+							"pm.expect(jsonData.weight).to.eql(29.0);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"ownerId\": 7,\n  \"name\": \"Rex\",\n  \"species\": \"CHIEN\",\n  \"breed\": \"Berger Allemand\",\n  \"birthDate\": \"2022-05-10\",\n  \"gender\": \"M\",\n  \"weight\": 29.0,\n  \"microchipId\": \"250269600123456\",\n  \"isSterilized\": true,\n  \"vaccinationStatus\": \"A_JOUR\",\n  \"healthStatus\": \"EXCELLENT\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/v1/animals/{{petId}}",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"v1",
+						"animals",
+						"{{petId}}"
+					]
+				}
+			}
+		},
+		{
+			"name": "16. Auth - Inscription Propriétaire (US01)",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"nom\": \"Dupont\",\n  \"prenom\": \"Jean\",\n  \"email\": \"jean.dupont@medivet.com\",\n  \"motDePasse\": \"Pass1234!\",\n  \"telephone\": \"+33612345678\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/auth/inscription",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"auth",
+						"inscription"
+					]
+				}
+			}
+		},
+		{
+			"name": "17. Auth - Connexion & Token JWT (US02)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.expect(pm.response.code).to.eql(200);",
+							"});",
+							"var jsonData = pm.response.json();",
+							"pm.collectionVariables.set(\"jwtToken\", jsonData.token);",
+							"pm.collectionVariables.set(\"ownerId\", jsonData.id);",
+							"console.log(\"Token JWT sauvegardé : \" + jsonData.token);"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"email\": \"jean.dupont@medivet.com\",\n  \"motDePasse\": \"Pass1234!\"\n}"
+				},
+				"url": {
+					"raw": "{{baseUrl}}/api/auth/connexion",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"auth",
+						"connexion"
+					]
+				}
+			}
+		},
+		{
+			"name": "18. Utilisateurs - Voir mon profil (Connecté)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwtToken}}"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/api/utilisateurs/moi",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"utilisateurs",
+						"moi"
+					]
+				}
+			}
+		},
+		{
+			"name": "19. Interconnexion - Mes Animaux via Utilisateurs (/api/utilisateurs/moi/animaux)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.expect(pm.response.code).to.eql(200);",
+							"});",
+							"pm.test(\"Retourne la liste des animaux du propriétaire connecté\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(Array.isArray(jsonData)).to.be.true;",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwtToken}}"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/api/utilisateurs/moi/animaux",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"utilisateurs",
+						"moi",
+						"animaux"
+					]
+				}
+			}
+		},
+		{
+			"name": "20. Interconnexion - Mes Rendez-vous via Utilisateurs (/api/utilisateurs/moi/rendez-vous)",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.expect(pm.response.code).to.eql(200);",
+							"});",
+							"pm.test(\"Retourne la liste des RDV du propriétaire connecté\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(Array.isArray(jsonData)).to.be.true;",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwtToken}}"
+					}
+				],
+				"url": {
+					"raw": "{{baseUrl}}/api/utilisateurs/moi/rendez-vous",
+					"host": [
+						"{{baseUrl}}"
+					],
+					"path": [
+						"api",
+						"utilisateurs",
+						"moi",
+						"rendez-vous"
+					]
+				}
+			}
+		}
+	]
+}

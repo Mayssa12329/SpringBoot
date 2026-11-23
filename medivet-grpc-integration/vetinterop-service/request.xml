@@ -1,0 +1,5 @@
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:v="http://medivet.tn/vetinterop">
+  <soapenv:Body>
+    <v:VerifyAnimalIdentityRequest><v:puce>250268500123456</v:puce></v:VerifyAnimalIdentityRequest>
+  </soapenv:Body>
+</soapenv:Envelope>
