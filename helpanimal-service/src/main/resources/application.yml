@@ -1,0 +1,70 @@
+server:
+  port: ${SERVER_PORT:8084}
+
+spring:
+  application:
+    name: helpanimal-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://helpanimal-db:5432/helpanimal_db}
+    username: ${SPRING_DATASOURCE_USERNAME:helpanimal_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:helpanimal_password}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      connection-init-sql: CREATE SCHEMA IF NOT EXISTS helpanimal_schema
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:update}
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: helpanimal_schema
+  flyway:
+    enabled: true
+    schemas: helpanimal_schema
+    default-schema: helpanimal_schema
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
+helpanimal:
+  storage:
+    directory: ${HELPANIMAL_PHOTOS_DIR:helpanimal-photos}
+  photo:
+    max-size-bytes: 5242880
+  duplicate:
+    radius-meters: 100
+    window-minutes: 120
+  nearby:
+    default-radius-km: 5
+    max-radius-km: 50
+
+# Lien gRPC (HTTP/2) vers RescueCoordinationService
+rescue:
+  grpc:
+    host: ${RESCUE_GRPC_HOST:rescuecoordination-service}
+    port: ${RESCUE_GRPC_PORT:9090}
+    timeout-ms: 3000       # RM13 : delai de 3 s par appel
+    max-attempts: 3        # RM13 : 1 appel + 2 reprises
+    retry-wait-ms: 200
+  watch:
+    # Abonnement au flux des missions (reattribution RM05, suivi US47)
+    enabled: ${RESCUE_WATCH_ENABLED:true}
+    reconnect-delay-ms: 5000
+
+petpass:
+  enabled: ${PETPASS_ENABLED:true}
+  base-url: ${PETPASS_SERVICE_URL:http://petpass-service:8082}
+
+auth:
+  service:
+    url: ${AUTH_SERVICE_URL:http://auth-service:8081}
+
+jwt:
+  secret: ${JWT_SECRET:MedivetSecretKey2024SuperLongueClePourLaSecuriteJWT!}
+  expiration: ${JWT_EXPIRATION:86400000}

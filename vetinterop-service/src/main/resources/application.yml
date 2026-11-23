@@ -1,0 +1,24 @@
+server:
+  port: ${SERVER_PORT:8087}
+
+spring:
+  application:
+    name: ${SERVICE_NAME:vetinterop-service}
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://vetinterop-db:5432/vetinterop_db}
+    username: ${SPRING_DATASOURCE_USERNAME:vetinterop_user}
+    password: ${SPRING_DATASOURCE_PASSWORD:vetinterop_password}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate        # le schéma est créé par Flyway
+  flyway:
+    enabled: true
+  webservices:
+    path: /ws                   # endpoint SOAP : POST /ws ; WSDL : GET /ws/vetinterop.wsdl
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
